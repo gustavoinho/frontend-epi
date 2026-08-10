@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || "https://backend-epi.onrender.com";
 
 export default function Login({ onLogin }) {
   const [senha, setSenha] = useState("");
@@ -9,7 +9,9 @@ export default function Login({ onLogin }) {
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    if (!senha.trim()) {
+    const senhaLimpa = senha.trim();
+
+    if (!senhaLimpa) {
       alert("Digite a senha.");
       return;
     }
@@ -17,8 +19,8 @@ export default function Login({ onLogin }) {
     setCarregando(true);
 
     try {
-      console.log("API:", API_URL);
-      console.log("Enviando senha para:", `${API_URL}/login`);
+      console.log("Backend:", API_URL);
+      console.log("Enviando login para:", `${API_URL}/login`);
 
       const response = await fetch(`${API_URL}/login`, {
         method: "POST",
@@ -26,26 +28,44 @@ export default function Login({ onLogin }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          senha: senha.trim(),
+          senha: senhaLimpa,
         }),
       });
 
+      const texto = await response.text();
+
+      let data = {};
+
+      try {
+        data = JSON.parse(texto);
+      } catch {
+        console.error("Resposta não-JSON do backend:", texto);
+      }
+
       console.log("Status:", response.status);
-
-      const data = await response.json();
-
-      console.log("Resposta do servidor:", data);
+      console.log("Resposta:", data);
 
       if (response.ok && data.ok === true) {
         localStorage.setItem("auth", "true");
         onLogin();
-      } else {
-        alert("Senha incorreta.");
+        return;
       }
-    } catch (error) {
-      console.error("ERRO NO LOGIN:", error);
+
+      if (response.status === 401) {
+        alert("Senha incorreta.");
+        return;
+      }
+
       alert(
-        "Não foi possível conectar ao servidor.\n\nVerifique se o backend do Render está funcionando."
+        data.error ||
+          `Erro no servidor. Código: ${response.status}`
+      );
+    } catch (error) {
+      console.error("ERRO DE CONEXÃO:", error);
+
+      alert(
+        "Não foi possível conectar ao backend.\n\n" +
+        "Verifique se o backend do Render está funcionando."
       );
     } finally {
       setCarregando(false);
@@ -68,7 +88,7 @@ export default function Login({ onLogin }) {
         style={{
           width: "100%",
           maxWidth: "380px",
-          background: "white",
+          background: "#fff",
           padding: "30px",
           borderRadius: "18px",
           boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
@@ -77,7 +97,6 @@ export default function Login({ onLogin }) {
         <h2
           style={{
             marginTop: 0,
-            marginBottom: "10px",
             textAlign: "center",
           }}
         >
@@ -100,6 +119,7 @@ export default function Login({ onLogin }) {
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
           autoFocus
+          disabled={carregando}
           style={{
             width: "100%",
             boxSizing: "border-box",
@@ -120,7 +140,7 @@ export default function Login({ onLogin }) {
             border: "none",
             borderRadius: "10px",
             background: carregando ? "#94a3b8" : "#2563eb",
-            color: "white",
+            color: "#fff",
             fontSize: "16px",
             fontWeight: "bold",
             cursor: carregando ? "not-allowed" : "pointer",
