@@ -1,26 +1,26 @@
 import React, { useState } from "react";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function Login({ onLogin }) {
   const [senha, setSenha] = useState("");
-  const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
-
-  const API_URL = import.meta.env.VITE_API_URL;
 
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    setErro("");
-
     if (!senha.trim()) {
-      setErro("Digite a senha.");
+      alert("Digite a senha.");
       return;
     }
 
     setCarregando(true);
 
     try {
-      const resposta = await fetch(`${API_URL}/login`, {
+      console.log("API:", API_URL);
+      console.log("Enviando senha para:", `${API_URL}/login`);
+
+      const response = await fetch(`${API_URL}/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -30,23 +30,26 @@ export default function Login({ onLogin }) {
         }),
       });
 
-      const dados = await resposta.json();
+      console.log("Status:", response.status);
 
-      if (!resposta.ok || !dados.ok) {
-        setErro("Senha incorreta.");
-        setCarregando(false);
-        return;
+      const data = await response.json();
+
+      console.log("Resposta do servidor:", data);
+
+      if (response.ok && data.ok === true) {
+        localStorage.setItem("auth", "true");
+        onLogin();
+      } else {
+        alert("Senha incorreta.");
       }
-
-      localStorage.setItem("auth", "true");
-      onLogin();
-
     } catch (error) {
-      console.error("Erro no login:", error);
-      setErro("Não foi possível conectar ao servidor.");
+      console.error("ERRO NO LOGIN:", error);
+      alert(
+        "Não foi possível conectar ao servidor.\n\nVerifique se o backend do Render está funcionando."
+      );
+    } finally {
+      setCarregando(false);
     }
-
-    setCarregando(false);
   };
 
   return (
@@ -67,21 +70,28 @@ export default function Login({ onLogin }) {
           maxWidth: "380px",
           background: "white",
           padding: "30px",
-          borderRadius: "16px",
+          borderRadius: "18px",
           boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
         }}
       >
-        <h2 style={{ marginBottom: "10px" }}>
-          Acesso ao sistema
+        <h2
+          style={{
+            marginTop: 0,
+            marginBottom: "10px",
+            textAlign: "center",
+          }}
+        >
+          Gestão de EPI
         </h2>
 
         <p
           style={{
+            textAlign: "center",
             color: "#64748b",
-            marginBottom: "20px",
+            marginBottom: "25px",
           }}
         >
-          Gestão de EPI
+          Digite sua senha para entrar
         </p>
 
         <input
@@ -89,14 +99,15 @@ export default function Login({ onLogin }) {
           placeholder="Digite a senha"
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
-          disabled={carregando}
+          autoFocus
           style={{
             width: "100%",
             boxSizing: "border-box",
-            padding: "12px",
+            padding: "13px",
             border: "1px solid #cbd5e1",
-            borderRadius: "8px",
-            marginBottom: "12px",
+            borderRadius: "10px",
+            fontSize: "16px",
+            marginBottom: "15px",
           }}
         />
 
@@ -105,28 +116,18 @@ export default function Login({ onLogin }) {
           disabled={carregando}
           style={{
             width: "100%",
-            padding: "12px",
+            padding: "13px",
             border: "none",
-            borderRadius: "8px",
-            background: "#2563eb",
+            borderRadius: "10px",
+            background: carregando ? "#94a3b8" : "#2563eb",
             color: "white",
-            cursor: "pointer",
+            fontSize: "16px",
+            fontWeight: "bold",
+            cursor: carregando ? "not-allowed" : "pointer",
           }}
         >
           {carregando ? "Entrando..." : "Entrar"}
         </button>
-
-        {erro && (
-          <p
-            style={{
-              color: "#dc2626",
-              marginTop: "15px",
-              textAlign: "center",
-            }}
-          >
-            {erro}
-          </p>
-        )}
       </form>
     </div>
   );
