@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-const SENHA = "1234"; // muda aqui depois
+const SENHA = "4321"; // muda aqui depois
 
 export default function Login({ onLogin }) {
   const [senha, setSenha] = useState("");
