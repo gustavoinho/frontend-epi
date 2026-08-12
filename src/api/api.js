@@ -1,4 +1,4 @@
-const API = "https://SEU-BACKEND.onrender.com"; // 🔥 troca aqui
+const API = import.meta.env.VITE_API_URL || "https://backend-epi.onrender.com";
 
 export const api = {
   async getItems(search = "") {
