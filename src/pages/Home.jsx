@@ -1,4 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { api } from "../api/api";
 import "./Home.css";
 
@@ -23,19 +28,32 @@ const CATEGORIAS = [
   },
 ];
 
+/* =========================================================
+   ARQUIVO -> DATA URL
+========================================================= */
 
 async function arquivoParaDataURL(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
     reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
+
+    reader.onerror = () =>
+      reject(new Error("Erro ao ler arquivo."));
 
     reader.readAsDataURL(file);
   });
 }
 
+/* =========================================================
+   OTIMIZAR IMAGEM
+========================================================= */
+
 async function imagemOtimizada(file) {
+  if (!file) {
+    throw new Error("Arquivo não informado.");
+  }
+
   if (!file.type.startsWith("image/")) {
     return arquivoParaDataURL(file);
   }
@@ -47,44 +65,112 @@ async function imagemOtimizada(file) {
       const img = new Image();
 
       img.onload = () => {
-        const limite = 1400;
+        const limite = 1000;
 
-        let width = img.width;
-        let height = img.height;
+        let width =
+          img.naturalWidth || img.width;
 
-        if (width > limite || height > limite) {
+        let height =
+          img.naturalHeight || img.height;
+
+        if (!width || !height) {
+          reject(
+            new Error(
+              "Não foi possível identificar a imagem."
+            )
+          );
+          return;
+        }
+
+        if (
+          width > limite ||
+          height > limite
+        ) {
           if (width > height) {
-            height = Math.round((height * limite) / width);
+            height = Math.round(
+              (height * limite) / width
+            );
+
             width = limite;
           } else {
-            width = Math.round((width * limite) / height);
+            width = Math.round(
+              (width * limite) / height
+            );
+
             height = limite;
           }
         }
 
-        const canvas = document.createElement("canvas");
+        const canvas =
+          document.createElement(
+            "canvas"
+          );
 
         canvas.width = width;
         canvas.height = height;
 
-        const ctx = canvas.getContext("2d");
+        const ctx =
+          canvas.getContext("2d");
 
-        ctx.drawImage(img, 0, 0, width, height);
+        if (!ctx) {
+          reject(
+            new Error(
+              "Não foi possível processar a imagem."
+            )
+          );
+          return;
+        }
 
-        resolve(
-          canvas.toDataURL("image/jpeg", 0.82)
+        ctx.fillStyle = "#ffffff";
+
+        ctx.fillRect(
+          0,
+          0,
+          width,
+          height
         );
+
+        ctx.drawImage(
+          img,
+          0,
+          0,
+          width,
+          height
+        );
+
+        const resultado =
+          canvas.toDataURL(
+            "image/jpeg",
+            0.72
+          );
+
+        resolve(resultado);
       };
 
-      img.onerror = reject;
+      img.onerror = () =>
+        reject(
+          new Error(
+            "Não foi possível carregar a imagem."
+          )
+        );
+
       img.src = reader.result;
     };
 
-    reader.onerror = reject;
+    reader.onerror = () =>
+      reject(
+        new Error(
+          "Não foi possível ler a imagem."
+        )
+      );
 
     reader.readAsDataURL(file);
   });
 }
+
+/* =========================================================
+   MODAL DE CONFIRMAÇÃO
+========================================================= */
 
 function ModalConfirmacao({
   titulo,
@@ -95,7 +181,9 @@ function ModalConfirmacao({
   return (
     <div className="modal-overlay">
       <div className="confirm-modal">
-        <div className="confirm-icon">⚠️</div>
+        <div className="confirm-icon">
+          ⚠️
+        </div>
 
         <h2>{titulo}</h2>
 
@@ -103,6 +191,7 @@ function ModalConfirmacao({
 
         <div className="confirm-actions">
           <button
+            type="button"
             className="btn-secondary"
             onClick={onCancelar}
           >
@@ -110,6 +199,7 @@ function ModalConfirmacao({
           </button>
 
           <button
+            type="button"
             className="btn-danger"
             onClick={onConfirmar}
           >
@@ -121,6 +211,10 @@ function ModalConfirmacao({
   );
 }
 
+/* =========================================================
+   MODAL DE ITEM
+========================================================= */
+
 function ItemModal({
   item,
   onClose,
@@ -128,58 +222,148 @@ function ItemModal({
 }) {
   const editando = Boolean(item);
 
-  const [nome, setNome] = useState(item?.nome || "");
-  const [quantidade, setQuantidade] = useState(
-    item?.quantidade || 0
+  const [nome, setNome] = useState(
+    item?.nome || ""
   );
-  const [status, setStatus] = useState(
-    item?.status || item?.tipo || "epi"
-  );
-  const [ca, setCa] = useState(item?.ca || "");
-  const [observacoes, setObservacoes] = useState(
-    item?.observacoes || ""
-  );
-  const [imagem, setImagem] = useState(item?.imagem || item?.foto || "");
 
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState("");
+  const [quantidade, setQuantidade] =
+    useState(
+      Number(item?.quantidade) || 0
+    );
 
-  const fotoInputRef = useRef(null);
+  const [status, setStatus] =
+    useState(
+      item?.status ||
+        item?.tipo ||
+        "epi"
+    );
+
+  const [ca, setCa] = useState(
+    item?.ca || ""
+  );
+
+  const [observacoes, setObservacoes] =
+    useState(
+      item?.observacoes || ""
+    );
+
+  const [imagem, setImagem] =
+    useState(
+      item?.imagem ||
+        item?.foto ||
+        ""
+    );
+
+  const [salvando, setSalvando] =
+    useState(false);
+
+  const [erro, setErro] =
+    useState("");
+
+  const fotoInputRef =
+    useRef(null);
+
+  /* =======================================================
+     SELECIONAR FOTO
+  ======================================================= */
 
   async function selecionarFoto(e) {
-    const file = e.target.files?.[0];
+    const file =
+      e.target.files?.[0];
 
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
-    if (!file.type.startsWith("image/")) {
-      setErro("A foto principal precisa ser uma imagem.");
+    if (
+      !file.type.startsWith(
+        "image/"
+      )
+    ) {
+      setErro(
+        "A foto principal precisa ser uma imagem."
+      );
+
+      e.target.value = "";
+
+      return;
+    }
+
+    if (
+      file.size >
+      15 * 1024 * 1024
+    ) {
+      setErro(
+        "A imagem original é muito grande. Escolha uma foto de até 15 MB."
+      );
+
+      e.target.value = "";
+
       return;
     }
 
     try {
       setErro("");
 
-      const dataUrl = await imagemOtimizada(file);
+      const dataUrl =
+        await imagemOtimizada(
+          file
+        );
+
+      if (
+        typeof dataUrl !==
+          "string" ||
+        !dataUrl.startsWith(
+          "data:image/"
+        )
+      ) {
+        throw new Error(
+          "Imagem inválida."
+        );
+      }
 
       setImagem(dataUrl);
-    } catch {
-      setErro("Não foi possível carregar a foto.");
-    }
+    } catch (error) {
+      console.error(
+        "Erro ao processar foto:",
+        error
+      );
 
-    e.target.value = "";
+      setErro(
+        "Não foi possível carregar a foto."
+      );
+    } finally {
+      e.target.value = "";
+    }
   }
 
-  
+  /* =======================================================
+     QUANTIDADE
+  ======================================================= */
 
-  function alterarQuantidade(valor) {
-    setQuantidade((atual) =>
-      Math.max(0, Number(atual || 0) + valor)
+  function alterarQuantidade(
+    valor
+  ) {
+    setQuantidade(
+      (atual) =>
+        Math.max(
+          0,
+          Number(atual || 0) +
+            valor
+        )
     );
   }
 
+  /* =======================================================
+     SALVAR
+  ======================================================= */
+
   async function salvar() {
     if (!nome.trim()) {
-      setErro("Digite o nome do item.");
+      setErro(
+        "Digite o nome do item."
+      );
+
       return;
     }
 
@@ -188,27 +372,61 @@ function ItemModal({
 
     try {
       const dados = {
-  nome: nome.trim(),
-  quantidade: Number(quantidade) || 0,
-  status,
-  tipo: status,
-  ca: status === "epi" ? ca.trim() : "",
-  observacoes: observacoes.trim(),
-  imagem,
-  foto: imagem,
-};
+        nome: nome.trim(),
+
+        quantidade:
+          Number(
+            quantidade
+          ) || 0,
+
+        status,
+
+        tipo: status,
+
+        ca:
+          status === "epi"
+            ? ca.trim()
+            : "",
+
+        observacoes:
+          observacoes.trim(),
+
+        imagem:
+          typeof imagem ===
+          "string"
+            ? imagem
+            : "",
+
+        anexos:
+          Array.isArray(
+            item?.anexos
+          )
+            ? item.anexos
+            : [],
+      };
 
       if (editando) {
-        await api.updateItem(item.id, dados);
+        await api.updateItem(
+          item.id,
+          dados
+        );
       } else {
-        await api.createItem(dados);
+        await api.createItem(
+          dados
+        );
       }
 
-      onSaved();
+      await onSaved();
+
       onClose();
     } catch (error) {
+      console.error(
+        "Erro ao salvar item:",
+        error
+      );
+
       setErro(
-        error.message ||
+        error?.message ||
           "Não foi possível salvar o item."
       );
     } finally {
@@ -232,11 +450,13 @@ function ItemModal({
             </h2>
 
             <p>
-              Preencha as informações do item abaixo.
+              Preencha as informações
+              do item abaixo.
             </p>
           </div>
 
           <button
+            type="button"
             className="modal-close"
             onClick={onClose}
             disabled={salvando}
@@ -249,6 +469,7 @@ function ItemModal({
           {erro && (
             <div className="form-error">
               <span>!</span>
+
               {erro}
             </div>
           )}
@@ -256,17 +477,22 @@ function ItemModal({
           <section className="form-section">
             <div className="section-title">
               <span>01</span>
+
               Informações básicas
             </div>
 
             <div className="form-grid">
               <label className="field field-full">
-                <span>Nome do item *</span>
+                <span>
+                  Nome do item *
+                </span>
 
                 <input
                   value={nome}
                   onChange={(e) =>
-                    setNome(e.target.value)
+                    setNome(
+                      e.target.value
+                    )
                   }
                   placeholder="Ex.: Capacete de segurança"
                   autoFocus
@@ -274,50 +500,69 @@ function ItemModal({
               </label>
 
               <div className="field field-full">
-                <span>Categoria do item *</span>
+                <span>
+                  Categoria do item *
+                </span>
 
                 <div className="category-grid">
-                  {CATEGORIAS.map((categoria) => (
-                    <button
-                      type="button"
-                      key={categoria.id}
-                      className={`category-option ${
-                        status === categoria.id
-                          ? "selected"
-                          : ""
-                      }`}
-                      onClick={() =>
-                        setStatus(categoria.id)
-                      }
-                    >
-                      <span className="category-icon">
-                        {categoria.icone}
-                      </span>
+                  {CATEGORIAS.map(
+                    (categoria) => (
+                      <button
+                        type="button"
+                        key={
+                          categoria.id
+                        }
+                        className={`category-option ${
+                          status ===
+                          categoria.id
+                            ? "selected"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          setStatus(
+                            categoria.id
+                          )
+                        }
+                      >
+                        <span className="category-icon">
+                          {
+                            categoria.icone
+                          }
+                        </span>
 
-                      <span>
-                        <strong>
-                          {categoria.nome}
-                        </strong>
+                        <span>
+                          <strong>
+                            {
+                              categoria.nome
+                            }
+                          </strong>
 
-                        <small>
-                          {categoria.descricao}
-                        </small>
-                      </span>
+                          <small>
+                            {
+                              categoria.descricao
+                            }
+                          </small>
+                        </span>
 
-                      <span className="radio-dot" />
-                    </button>
-                  ))}
+                        <span className="radio-dot" />
+                      </button>
+                    )
+                  )}
                 </div>
               </div>
 
               <div className="field">
-                <span>Quantidade</span>
+                <span>
+                  Quantidade
+                </span>
 
                 <div className="quantity-editor">
                   <button
                     type="button"
                     onClick={() =>
-                      alterarQuantidade(-1)
+                      alterarQuantidade(
+                        -1
+                      )
                     }
                   >
                     −
@@ -326,12 +571,17 @@ function ItemModal({
                   <input
                     type="number"
                     min="0"
-                    value={quantidade}
+                    value={
+                      quantidade
+                    }
                     onChange={(e) =>
                       setQuantidade(
                         Math.max(
                           0,
-                          Number(e.target.value) || 0
+                          Number(
+                            e.target
+                              .value
+                          ) || 0
                         )
                       )
                     }
@@ -340,7 +590,9 @@ function ItemModal({
                   <button
                     type="button"
                     onClick={() =>
-                      alterarQuantidade(1)
+                      alterarQuantidade(
+                        1
+                      )
                     }
                   >
                     +
@@ -348,14 +600,17 @@ function ItemModal({
                 </div>
               </div>
 
-              {status === "epi" && (
+              {status ===
+                "epi" && (
                 <label className="field">
                   <span>CA</span>
 
                   <input
                     value={ca}
                     onChange={(e) =>
-                      setCa(e.target.value)
+                      setCa(
+                        e.target.value
+                      )
                     }
                     placeholder="Ex.: 12345"
                   />
@@ -363,12 +618,19 @@ function ItemModal({
               )}
 
               <label className="field field-full">
-                <span>Observações</span>
+                <span>
+                  Observações
+                </span>
 
                 <textarea
-                  value={observacoes}
+                  value={
+                    observacoes
+                  }
                   onChange={(e) =>
-                    setObservacoes(e.target.value)
+                    setObservacoes(
+                      e.target
+                        .value
+                    )
                   }
                   placeholder="Informações adicionais sobre o item..."
                   rows={4}
@@ -380,31 +642,51 @@ function ItemModal({
           <section className="form-section">
             <div className="section-title">
               <span>02</span>
+
               Foto do item
             </div>
 
             <div
               className={`photo-upload ${
-                imagem ? "has-image" : ""
+                imagem
+                  ? "has-image"
+                  : ""
               }`}
               onClick={() =>
                 fotoInputRef.current?.click()
               }
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (
+                  e.key ===
+                    "Enter" ||
+                  e.key === " "
+                ) {
+                  fotoInputRef.current?.click();
+                }
+              }}
             >
               {imagem ? (
                 <>
                   <img
                     src={imagem}
-                    alt={nome || "Item"}
+                    alt={
+                      nome ||
+                      "Item"
+                    }
                   />
 
                   <div className="photo-overlay">
                     <span>📷</span>
+
                     <strong>
                       Alterar foto
                     </strong>
+
                     <small>
-                      Clique para selecionar outra
+                      Clique para
+                      selecionar outra
                     </small>
                   </div>
                 </>
@@ -419,38 +701,44 @@ function ItemModal({
                   </strong>
 
                   <small>
-                    A foto também será usada na
-                    pesquisa inteligente por imagem.
+                    A foto também
+                    será usada na
+                    pesquisa
+                    inteligente por
+                    imagem.
                   </small>
                 </div>
               )}
             </div>
 
             <input
-  ref={fotoInputRef}
-  type="file"
-  accept="image/*"
-  capture="environment"
-  hidden
-  onChange={selecionarFoto}
-/>
+              ref={fotoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              capture="environment"
+              hidden
+              onChange={
+                selecionarFoto
+              }
+            />
 
             {imagem && (
               <button
                 type="button"
                 className="remove-photo"
-                onClick={() => setImagem("")}
+                onClick={() =>
+                  setImagem("")
+                }
               >
                 Remover foto
               </button>
             )}
           </section>
-
-          
         </div>
 
         <div className="modal-footer">
           <button
+            type="button"
             className="btn-secondary"
             onClick={onClose}
             disabled={salvando}
@@ -459,6 +747,7 @@ function ItemModal({
           </button>
 
           <button
+            type="button"
             className="btn-primary"
             onClick={salvar}
             disabled={salvando}
@@ -466,11 +755,13 @@ function ItemModal({
             {salvando ? (
               <>
                 <span className="spinner" />
+
                 Salvando...
               </>
             ) : (
               <>
                 ✓
+
                 {editando
                   ? "Salvar alterações"
                   : "Cadastrar item"}
@@ -483,24 +774,58 @@ function ItemModal({
   );
 }
 
+/* =========================================================
+   PESQUISA VISUAL
+========================================================= */
+
 function VisualSearchModal({
   onClose,
   onResults,
 }) {
-  const inputRef = useRef(null);
+  const inputRef =
+    useRef(null);
 
-  const [imagem, setImagem] = useState("");
+  const [imagem, setImagem] =
+    useState("");
+
   const [carregando, setCarregando] =
     useState(false);
-  const [erro, setErro] = useState("");
+
+  const [erro, setErro] =
+    useState("");
 
   async function selecionar(e) {
-    const file = e.target.files?.[0];
+    const file =
+      e.target.files?.[0];
 
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
-    if (!file.type.startsWith("image/")) {
-      setErro("Selecione uma imagem.");
+    if (
+      !file.type.startsWith(
+        "image/"
+      )
+    ) {
+      setErro(
+        "Selecione uma imagem."
+      );
+
+      e.target.value = "";
+
+      return;
+    }
+
+    if (
+      file.size >
+      15 * 1024 * 1024
+    ) {
+      setErro(
+        "A imagem é muito grande. Escolha uma foto de até 15 MB."
+      );
+
+      e.target.value = "";
+
       return;
     }
 
@@ -508,16 +833,22 @@ function VisualSearchModal({
       setErro("");
 
       const dataUrl =
-        await imagemOtimizada(file);
+        await imagemOtimizada(
+          file
+        );
 
       setImagem(dataUrl);
-    } catch {
+    } catch (error) {
+      console.error(
+        error
+      );
+
       setErro(
         "Não foi possível carregar a imagem."
       );
+    } finally {
+      e.target.value = "";
     }
-
-    e.target.value = "";
   }
 
   async function pesquisar() {
@@ -525,6 +856,7 @@ function VisualSearchModal({
       setErro(
         "Selecione uma foto para pesquisar."
       );
+
       return;
     }
 
@@ -533,16 +865,27 @@ function VisualSearchModal({
 
     try {
       const resposta =
-        await api.searchByImage(imagem);
+        await api.searchByImage(
+          imagem
+        );
 
       onResults(
-        resposta.resultados || []
+        Array.isArray(
+          resposta?.resultados
+        )
+          ? resposta.resultados
+          : []
       );
 
       onClose();
     } catch (error) {
+      console.error(
+        "Erro na pesquisa visual:",
+        error
+      );
+
       setErro(
-        error.message ||
+        error?.message ||
           "Erro na pesquisa visual."
       );
     } finally {
@@ -559,17 +902,22 @@ function VisualSearchModal({
               INTELIGÊNCIA VISUAL
             </span>
 
-            <h2>Pesquisar por foto</h2>
+            <h2>
+              Pesquisar por foto
+            </h2>
 
             <p>
-              Envie uma foto e encontre itens
-              visualmente semelhantes.
+              Envie uma foto e encontre
+              itens visualmente
+              semelhantes.
             </p>
           </div>
 
           <button
+            type="button"
             className="modal-close"
             onClick={onClose}
+            disabled={carregando}
           >
             ×
           </button>
@@ -579,13 +927,17 @@ function VisualSearchModal({
           {erro && (
             <div className="form-error">
               <span>!</span>
+
               {erro}
             </div>
           )}
 
           <button
+            type="button"
             className={`visual-dropzone ${
-              imagem ? "has-image" : ""
+              imagem
+                ? "has-image"
+                : ""
             }`}
             onClick={() =>
               inputRef.current?.click()
@@ -607,26 +959,30 @@ function VisualSearchModal({
                 </strong>
 
                 <small>
-                  Por exemplo: tire uma foto de
-                  um capacete para encontrar
+                  Por exemplo: tire uma
+                  foto de um capacete
+                  para encontrar
                   capacetes cadastrados.
                 </small>
               </>
             )}
           </button>
 
-         <input
-  ref={inputRef}
-  type="file"
-  accept="image/*"
-  capture="environment"
-  hidden
-  onChange={selecionar}
-/>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            capture="environment"
+            hidden
+            onChange={
+              selecionar
+            }
+          />
         </div>
 
         <div className="modal-footer">
           <button
+            type="button"
             className="btn-secondary"
             onClick={onClose}
             disabled={carregando}
@@ -635,18 +991,24 @@ function VisualSearchModal({
           </button>
 
           <button
+            type="button"
             className="btn-primary"
             onClick={pesquisar}
-            disabled={carregando}
+            disabled={
+              carregando ||
+              !imagem
+            }
           >
             {carregando ? (
               <>
                 <span className="spinner" />
+
                 Analisando foto...
               </>
             ) : (
               <>
                 🔎
+
                 Encontrar item
               </>
             )}
@@ -657,258 +1019,803 @@ function VisualSearchModal({
   );
 }
 
-function ItemCard({ item, onEditar, onExcluir, onAlterarQuantidade }) {
-  const [expandido, setExpandido] = useState(false);
-  const [qtdDigito, setQtdDigito] = useState(1);
+/* =========================================================
+   CARD DO ITEM
+========================================================= */
 
-  const fotoExibicao = item.imagem || item.foto;
+function ItemCard({
+  item,
+  onEditar,
+  onExcluir,
+  onAlterarQuantidade,
+}) {
+  const [expandido, setExpandido] =
+    useState(false);
+
+  const [qtdDigito, setQtdDigito] =
+    useState(1);
+
+  const fotoExibicao =
+    item.imagem ||
+    item.foto ||
+    "";
+
+  const categoria =
+    item.status ||
+    item.tipo ||
+    "epi";
+
+  const categoriaNome =
+    CATEGORIAS.find(
+      (c) =>
+        c.id === categoria
+    )?.nome ||
+    "EPI";
 
   return (
-    <div className="item-card">
-      <div
-        onClick={() => setExpandido(!expandido)}
-        style={{
-          cursor: "pointer",
-          display: "flex",
-          justifyContent: "space-between",
-          padding: "12px",
-        }}
-      >
-        <div>
-          <strong>{item.nome}</strong>
+    <article className="item-card">
+      <div className="item-image">
+        {fotoExibicao ? (
+          <img
+            src={fotoExibicao}
+            alt={item.nome}
+            loading="lazy"
+          />
+        ) : (
+          <div className="no-image">
+            <span>📦</span>
 
-          {item.ca && (
-            <span
-              style={{
-                marginLeft: "10px",
-                color: "#666",
-              }}
-            >
-              CA: {item.ca}
-            </span>
-          )}
-        </div>
+            <small>
+              Sem foto
+            </small>
+          </div>
+        )}
 
-        <div>
-          <span>Qtd: {item.quantidade}</span>{" "}
-          {expandido ? "▲" : "▼"}
-        </div>
+        <span
+          className={`item-badge badge-${categoria}`}
+        >
+          {categoriaNome}
+        </span>
       </div>
 
-      {expandido && (
+      <div className="item-content">
         <div
-          style={{
-            padding: "12px",
-            borderTop: "1px solid #eee",
-          }}
+          className="item-title-row"
+          onClick={() =>
+            setExpandido(
+              !expandido
+            )
+          }
         >
-          {fotoExibicao && (
-            <img
-              src={fotoExibicao}
-              alt={item.nome}
-              style={{
-                maxHeight: "150px",
-              }}
-            />
-          )}
+          <div>
+            <h3>
+              {item.nome}
+            </h3>
 
-          {item.observacoes && (
-            <p>Obs: {item.observacoes}</p>
-          )}
+            {item.ca && (
+              <span className="ca-label">
+                CA: {item.ca}
+              </span>
+            )}
+          </div>
 
-          <div
-            style={{
-              display: "flex",
-              gap: "8px",
-              margin: "10px 0",
+          <button
+            type="button"
+            className="edit-icon-button"
+            title="Editar item"
+            onClick={(e) => {
+              e.stopPropagation();
+
+              onEditar(item);
             }}
           >
-            <input
-              type="number"
-              min="1"
-              value={qtdDigito}
-              onChange={(e) =>
-                setQtdDigito(
-                  Number(e.target.value) || 1
-                )
-              }
-              style={{
-                width: "60px",
-                textAlign: "center",
-              }}
-            />
+            ✎
+          </button>
+        </div>
 
+        <p className="item-description">
+          {item.observacoes ||
+            "Nenhuma observação cadastrada."}
+        </p>
+
+        {Array.isArray(
+          item.anexos
+        ) &&
+          item.anexos.length >
+            0 && (
+            <span className="attachments-count">
+              📎{" "}
+              {item.anexos.length}{" "}
+              anexo
+              {item.anexos.length !==
+              1
+                ? "s"
+                : ""}
+            </span>
+          )}
+
+        <div className="item-footer">
+          <div className="stock">
+            <span>
+              Estoque
+            </span>
+
+            <strong>
+              {Number(
+                item.quantidade
+              ) || 0}
+            </strong>
+          </div>
+
+          <div
+            className="quantity-buttons"
+            onClick={(e) =>
+              e.stopPropagation()
+            }
+          >
             <button
+              type="button"
               onClick={() =>
                 onAlterarQuantidade(
                   item,
                   "subtrair",
-                  qtdDigito
+                  1
                 )
               }
+              disabled={
+                Number(
+                  item.quantidade
+                ) <= 0
+              }
             >
-              -
+              −
             </button>
 
+            <span>
+              {Number(
+                item.quantidade
+              ) || 0}
+            </span>
+
             <button
+              type="button"
               onClick={() =>
                 onAlterarQuantidade(
                   item,
                   "somar",
-                  qtdDigito
+                  1
                 )
               }
             >
               +
             </button>
           </div>
+        </div>
 
-          <div
-            style={{
-              display: "flex",
-              gap: "8px",
-            }}
-          >
-            <button onClick={() => onEditar(item)}>
-              Editar
-            </button>
+        {expandido && (
+          <div className="item-expanded">
+            <div className="quick-quantity">
+              <span>
+                Alterar quantidade
+              </span>
 
-            <button onClick={() => onExcluir(item)}>
-              Excluir
+              <div className="quick-quantity-controls">
+                <input
+                  type="number"
+                  min="1"
+                  value={
+                    qtdDigito
+                  }
+                  onChange={(e) =>
+                    setQtdDigito(
+                      Math.max(
+                        1,
+                        Number(
+                          e.target
+                            .value
+                        ) || 1
+                      )
+                    )
+                  }
+                />
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onAlterarQuantidade(
+                      item,
+                      "subtrair",
+                      qtdDigito
+                    )
+                  }
+                >
+                  −
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onAlterarQuantidade(
+                      item,
+                      "somar",
+                      qtdDigito
+                    )
+                  }
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="delete-button"
+              onClick={() =>
+                onExcluir(item)
+              }
+            >
+              🗑 Excluir item
             </button>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </article>
   );
 }
 
+/* =========================================================
+   HOME
+========================================================= */
+
 export default function Home() {
-  const [items, setItems] = useState([]);
-  const [tab, setTab] = useState("epi");
-  const [search, setSearch] = useState("");
+  const [items, setItems] =
+    useState([]);
 
-  const [modal, setModal] = useState(null);
+  const [tab, setTab] =
+    useState("epi");
 
-  const [itemParaExcluir, setItemParaExcluir] =
+  const [search, setSearch] =
+    useState("");
+
+  const [modal, setModal] =
     useState(null);
 
-  const [visualResults, setVisualResults] =
-    useState(null);
+  const [
+    itemParaExcluir,
+    setItemParaExcluir,
+  ] = useState(null);
 
-  const [carregando, setCarregando] =
-    useState(false);
+  const [
+    visualResults,
+    setVisualResults,
+  ] = useState(null);
+
+  const [
+    carregando,
+    setCarregando,
+  ] = useState(false);
+
+  /* =======================================================
+     STATUS ONLINE / OFFLINE
+  ======================================================= */
+
+  const [online, setOnline] =
+    useState(
+      typeof navigator !==
+        "undefined"
+        ? navigator.onLine
+        : true
+    );
+
+  const [
+    pendentes,
+    setPendentes,
+  ] = useState(0);
+
+  const [
+    ultimaEdicao,
+    setUltimaEdicao,
+  ] = useState(null);
+
+  const importInputRef =
+    useRef(null);
+
+  /* =======================================================
+     ATUALIZAR STATUS
+  ======================================================= */
+
+  function atualizarStatus() {
+    if (
+      typeof navigator !==
+      "undefined"
+    ) {
+      setOnline(
+        navigator.onLine
+      );
+    }
+
+    setPendentes(
+      api.getPendingCount()
+    );
+
+    setUltimaEdicao(
+      api.getLastEdit()
+    );
+  }
+
+  useEffect(() => {
+    atualizarStatus();
+
+    function quandoOnline() {
+      atualizarStatus();
+    }
+
+    function quandoOffline() {
+      atualizarStatus();
+    }
+
+    function quandoEstoqueAtualizado() {
+      atualizarStatus();
+    }
+
+    window.addEventListener(
+      "online",
+      quandoOnline
+    );
+
+    window.addEventListener(
+      "offline",
+      quandoOffline
+    );
+
+    window.addEventListener(
+      "estoque-atualizado",
+      quandoEstoqueAtualizado
+    );
+
+    const intervalo =
+      setInterval(
+        atualizarStatus,
+        1000
+      );
+
+    return () => {
+      window.removeEventListener(
+        "online",
+        quandoOnline
+      );
+
+      window.removeEventListener(
+        "offline",
+        quandoOffline
+      );
+
+      window.removeEventListener(
+        "estoque-atualizado",
+        quandoEstoqueAtualizado
+      );
+
+      clearInterval(
+        intervalo
+      );
+    };
+  }, []);
+
+  /* =======================================================
+     FORMATAR ÚLTIMA EDIÇÃO
+  ======================================================= */
+
+  function formatarUltimaEdicao(
+    data
+  ) {
+    if (!data) {
+      return "Nenhuma edição registrada";
+    }
+
+    const dataObj =
+      new Date(data);
+
+    if (
+      Number.isNaN(
+        dataObj.getTime()
+      )
+    ) {
+      return "Nenhuma edição registrada";
+    }
+
+    return dataObj.toLocaleString(
+      "pt-BR",
+      {
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }
+    );
+  }
+
+  /* =======================================================
+     CARREGAR
+  ======================================================= */
 
   async function load() {
     try {
       setCarregando(true);
 
-      const data = await api.getItems(search);
+      const data =
+        await api.getItems(
+          search
+        );
 
-      setItems(Array.isArray(data) ? data : []);
+      setItems(
+        Array.isArray(data)
+          ? data
+          : []
+      );
+
+      atualizarStatus();
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Erro ao carregar itens:",
+        error
+      );
     } finally {
       setCarregando(false);
     }
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      load();
-    }, 250);
+    const timer =
+      setTimeout(() => {
+        load();
+      }, 250);
 
-    return () => clearTimeout(timer);
+    return () =>
+      clearTimeout(timer);
   }, [search]);
 
-  async function alterarQuantidade(item, operacao, valorEscolhido) {
-  const valor = Number(valorEscolhido || 1);
+  /* =======================================================
+     QUANTIDADE
+  ======================================================= */
 
-  if (!Number.isInteger(valor) || valor <= 0) return;
+  async function alterarQuantidade(
+    item,
+    operacao,
+    valorEscolhido
+  ) {
+    const valor =
+      Number(
+        valorEscolhido || 1
+      );
 
-  const delta = operacao === "somar" ? valor : -valor;
+    if (
+      !Number.isInteger(valor) ||
+      valor <= 0
+    ) {
+      return;
+    }
 
-  try {
-    const atualizado = await api.updateQty(item.id, delta);
+    const delta =
+      operacao ===
+      "somar"
+        ? valor
+        : -valor;
 
-    setItems((anteriores) =>
-      anteriores.map((i) =>
-        i.id === (atualizado.id || item.id)
-          ? {
-              ...i,
-              quantidade:
-                atualizado.quantidade !== undefined
-                  ? atualizado.quantidade
-                  : i.quantidade + delta,
-              imagem: atualizado.imagem || i.imagem,
-              foto: atualizado.foto || i.foto,
-            }
-          : i
-      )
-    );
-  } catch (error) {
-    console.error(error);
+    try {
+      const atualizado =
+        await api.updateQty(
+          item.id,
+          delta
+        );
+
+      setItems(
+        (anteriores) =>
+          anteriores.map(
+            (i) =>
+              String(i.id) ===
+              String(
+                atualizado.id ||
+                  item.id
+              )
+                ? {
+                    ...i,
+                    ...atualizado,
+                  }
+                : i
+          )
+      );
+
+      atualizarStatus();
+    } catch (error) {
+      console.error(
+        "Erro ao alterar quantidade:",
+        error
+      );
+
+      alert(
+        error?.message ||
+          "Não foi possível alterar a quantidade."
+      );
+    }
   }
-}
+
+  /* =======================================================
+     EXCLUIR
+  ======================================================= */
 
   async function excluirItem() {
-    if (!itemParaExcluir) return;
+    if (
+      !itemParaExcluir
+    ) {
+      return;
+    }
 
     try {
       await api.deleteItem(
         itemParaExcluir.id
       );
 
-      setItemParaExcluir(null);
+      setItemParaExcluir(
+        null
+      );
 
       await load();
+
+      atualizarStatus();
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Erro ao excluir:",
+        error
+      );
+
+      alert(
+        error?.message ||
+          "Não foi possível excluir o item."
+      );
     }
   }
 
-  const itemsExibidos = useMemo(() => {
-    if (visualResults !== null) {
-      return visualResults;
+  /* =======================================================
+     EXPORTAR BACKUP
+  ======================================================= */
+
+  async function exportarBackup() {
+    try {
+      const backup =
+        await api.exportBackup();
+
+      const json =
+        JSON.stringify(
+          backup,
+          null,
+          2
+        );
+
+      const blob =
+        new Blob(
+          [json],
+          {
+            type:
+              "application/json",
+          }
+        );
+
+      const url =
+        URL.createObjectURL(
+          blob
+        );
+
+      const link =
+        document.createElement(
+          "a"
+        );
+
+      link.href = url;
+
+      const data =
+        new Date()
+          .toISOString()
+          .slice(0, 10);
+
+      link.download =
+        `backup-estoque-${data}.json`;
+
+      document.body.appendChild(
+        link
+      );
+
+      link.click();
+
+      link.remove();
+
+      URL.revokeObjectURL(
+        url
+      );
+
+      atualizarStatus();
+    } catch (error) {
+      console.error(
+        "Erro ao exportar backup:",
+        error
+      );
+
+      alert(
+        error?.message ||
+          "Não foi possível exportar o backup."
+      );
+    }
+  }
+
+  /* =======================================================
+     IMPORTAR BACKUP
+  ======================================================= */
+
+  async function importarBackup(
+    event
+  ) {
+    const file =
+      event.target.files?.[0];
+
+    if (!file) {
+      return;
     }
 
-    return items.filter(
-      (item) =>
-        (item.status || item.tipo) === tab
-    );
-  }, [
-    items,
-    tab,
-    visualResults,
-  ]);
+    try {
+      if (
+        !file.name
+          .toLowerCase()
+          .endsWith(".json")
+      ) {
+        throw new Error(
+          "Selecione um arquivo JSON."
+        );
+      }
 
-  const contadores = useMemo(() => {
-    return {
-      epi: items.filter(
-        (i) =>
-          (i.status || i.tipo) === "epi"
-      ).length,
+      const texto =
+        await file.text();
 
-      material: items.filter(
-        (i) =>
-          (i.status || i.tipo) ===
-          "material"
-      ).length,
+      const backup =
+        JSON.parse(texto);
 
-      uniforme: items.filter(
-        (i) =>
-          (i.status || i.tipo) ===
-          "uniforme"
-      ).length,
-    };
-  }, [items]);
+      if (
+        !backup ||
+        !Array.isArray(
+          backup.items
+        )
+      ) {
+        throw new Error(
+          "Esse arquivo não parece ser um backup válido do Controle EPI."
+        );
+      }
+
+      const confirmar =
+        window.confirm(
+          `O backup contém ${backup.items.length} item(ns).\n\nA restauração substituirá o estoque atual pelo conteúdo do backup.\n\nDeseja continuar?`
+        );
+
+      if (!confirmar) {
+        return;
+      }
+
+      await api.importBackup(
+        backup
+      );
+
+      /*
+       * Recarrega usando o cache
+       * atualizado pelo importBackup.
+       */
+
+      const dados =
+        await api.getItems(
+          search
+        );
+
+      setItems(
+        Array.isArray(dados)
+          ? dados
+          : []
+      );
+
+      atualizarStatus();
+
+      alert(
+        "Backup importado com sucesso."
+      );
+    } catch (error) {
+      console.error(
+        "Erro ao importar backup:",
+        error
+      );
+
+      alert(
+        error?.message ||
+          "Não foi possível importar o backup."
+      );
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  /* =======================================================
+     FILTROS
+  ======================================================= */
+
+  const itemsExibidos =
+    useMemo(() => {
+      if (
+        visualResults !==
+        null
+      ) {
+        return visualResults;
+      }
+
+      return items.filter(
+        (item) =>
+          (item.status ||
+            item.tipo) ===
+          tab
+      );
+    }, [
+      items,
+      tab,
+      visualResults,
+    ]);
+
+  /* =======================================================
+     CONTADORES
+  ======================================================= */
+
+  const contadores =
+    useMemo(() => {
+      return {
+        epi: items.filter(
+          (i) =>
+            (i.status ||
+              i.tipo) ===
+            "epi"
+        ).length,
+
+        material:
+          items.filter(
+            (i) =>
+              (i.status ||
+                i.tipo) ===
+              "material"
+          ).length,
+
+        uniforme:
+          items.filter(
+            (i) =>
+              (i.status ||
+                i.tipo) ===
+              "uniforme"
+          ).length,
+      };
+    }, [items]);
+
+  /* =======================================================
+     LIMPAR PESQUISA VISUAL
+  ======================================================= */
 
   function limparPesquisaVisual() {
-    setVisualResults(null);
+    setVisualResults(
+      null
+    );
   }
+
+  /* =======================================================
+     RENDER
+  ======================================================= */
 
   return (
     <div className="app-shell">
+      {/* =================================================
+          TOPO
+      ================================================= */}
+
       <header className="topbar">
         <div className="brand">
           <div className="brand-icon">
@@ -926,11 +1833,41 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="topbar-status">
-          <span className="status-dot" />
-          Sistema online
+        <div className="topbar-status-area">
+          <div
+            className={`topbar-status ${
+              online
+                ? "online"
+                : "offline"
+            }`}
+          >
+            <span className="status-dot" />
+
+            {online
+              ? "Sistema online"
+              : "Modo offline"}
+          </div>
+
+          {pendentes > 0 && (
+            <div className="sync-pending">
+              ⟳{" "}
+              {pendentes}{" "}
+              alteração
+              {pendentes !== 1
+                ? "ões"
+                : ""}{" "}
+              pendente
+              {pendentes !== 1
+                ? "s"
+                : ""}
+            </div>
+          )}
         </div>
       </header>
+
+      {/* =================================================
+          CONTEÚDO
+      ================================================= */}
 
       <main className="main-content">
         <div className="page-heading">
@@ -944,12 +1881,14 @@ export default function Home() {
             </h1>
 
             <p>
-              Gerencie EPIs, materiais e
-              uniformes em um só lugar.
+              Gerencie EPIs, materiais
+              e uniformes em um só
+              lugar.
             </p>
           </div>
 
           <button
+            type="button"
             className="new-item-button"
             onClick={() =>
               setModal({
@@ -959,26 +1898,93 @@ export default function Home() {
             }
           >
             <span>+</span>
+
             Novo item
           </button>
         </div>
 
+        {/* =================================================
+            FERRAMENTAS
+        ================================================= */}
+
         <div className="toolbar">
+          <div className="last-edit-bar">
+            <div className="last-edit-info">
+              <span className="last-edit-icon">
+                🕒
+              </span>
+
+              <div>
+                <strong>
+                  Última edição
+                </strong>
+
+                <span>
+                  {formatarUltimaEdicao(
+                    ultimaEdicao
+                  )}
+                </span>
+              </div>
+            </div>
+
+            <div className="backup-actions">
+              <button
+                type="button"
+                className="backup-button"
+                onClick={
+                  exportarBackup
+                }
+              >
+                ↓ Exportar JSON
+              </button>
+
+              <button
+                type="button"
+                className="backup-button"
+                onClick={() =>
+                  importInputRef.current?.click()
+                }
+              >
+                ↑ Importar JSON
+              </button>
+
+              <input
+                ref={
+                  importInputRef
+                }
+                type="file"
+                accept=".json,application/json"
+                hidden
+                onChange={
+                  importarBackup
+                }
+              />
+            </div>
+          </div>
+
           <div className="search-box">
             <span>⌕</span>
 
             <input
               value={search}
               onChange={(e) => {
-                setSearch(e.target.value);
-                setVisualResults(null);
+                setSearch(
+                  e.target.value
+                );
+
+                setVisualResults(
+                  null
+                );
               }}
               placeholder="Pesquisar por nome, CA ou observação..."
             />
 
             {search && (
               <button
-                onClick={() => setSearch("")}
+                type="button"
+                onClick={() =>
+                  setSearch("")
+                }
               >
                 ×
               </button>
@@ -986,6 +1992,7 @@ export default function Home() {
           </div>
 
           <button
+            type="button"
             className="photo-search-button"
             onClick={() =>
               setModal({
@@ -994,25 +2001,35 @@ export default function Home() {
             }
           >
             <span>📷</span>
+
             Pesquisar por foto
           </button>
         </div>
 
-        {visualResults !== null && (
+        {/* =================================================
+            RESULTADOS VISUAIS
+        ================================================= */}
+
+        {visualResults !==
+          null && (
           <div className="visual-results-banner">
             <div>
               <strong>
-                Resultados da pesquisa visual
+                Resultados da pesquisa
+                visual
               </strong>
 
               <span>
                 Foram encontrados{" "}
-                {visualResults.length} itens
-                semelhantes.
+                {
+                  visualResults.length
+                }{" "}
+                itens semelhantes.
               </span>
             </div>
 
             <button
+              type="button"
               onClick={
                 limparPesquisaVisual
               }
@@ -1022,44 +2039,73 @@ export default function Home() {
           </div>
         )}
 
-        {visualResults === null && (
+        {/* =================================================
+            ABAS
+        ================================================= */}
+
+        {visualResults ===
+          null && (
           <div className="tabs">
-            {CATEGORIAS.map((categoria) => (
-              <button
-                key={categoria.id}
-                className={
-                  tab === categoria.id
-                    ? "active"
-                    : ""
-                }
-                onClick={() =>
-                  setTab(categoria.id)
-                }
-              >
-                <span>
-                  {categoria.icone}
-                </span>
-
-                {categoria.nome}
-
-                <small>
-                  {contadores[
+            {CATEGORIAS.map(
+              (categoria) => (
+                <button
+                  type="button"
+                  key={
                     categoria.id
-                  ]}
-                </small>
-              </button>
-            ))}
+                  }
+                  className={
+                    tab ===
+                    categoria.id
+                      ? "active"
+                      : ""
+                  }
+                  onClick={() =>
+                    setTab(
+                      categoria.id
+                    )
+                  }
+                >
+                  <span>
+                    {
+                      categoria.icone
+                    }
+                  </span>
+
+                  {
+                    categoria.nome
+                  }
+
+                  <small>
+                    {
+                      contadores[
+                        categoria.id
+                      ]
+                    }
+                  </small>
+                </button>
+              )
+            )}
           </div>
         )}
+
+        {/* =================================================
+            CARREGANDO
+        ================================================= */}
 
         {carregando ? (
           <div className="loading-state">
             <div className="loading-spinner" />
+
             <strong>
               Carregando estoque...
             </strong>
           </div>
-        ) : itemsExibidos.length === 0 ? (
+        ) : itemsExibidos.length ===
+          0 ? (
+          /* =================================================
+             VAZIO
+          ================================================= */
+
           <div className="empty-state">
             <div className="empty-icon">
               📦
@@ -1070,16 +2116,19 @@ export default function Home() {
             </h2>
 
             <p>
-              {visualResults !== null
+              {visualResults !==
+              null
                 ? "Não encontramos itens visualmente semelhantes a essa foto."
                 : search
                 ? "Tente pesquisar por outro termo."
                 : "Comece cadastrando seu primeiro item."}
             </p>
 
-            {visualResults === null &&
+            {visualResults ===
+              null &&
               !search && (
                 <button
+                  type="button"
                   className="btn-primary"
                   onClick={() =>
                     setModal({
@@ -1088,57 +2137,94 @@ export default function Home() {
                     })
                   }
                 >
-                  + Cadastrar primeiro item
+                  + Cadastrar primeiro
+                  item
                 </button>
               )}
           </div>
         ) : (
-  <div className="items-grid">
-    {itemsExibidos.map((item) => (
-      <ItemCard
-        key={item.id}
-        item={item}
-        onEditar={(i) =>
-          setModal({
-            tipo: "item",
-            item: i,
-          })
-        }
-        onExcluir={(i) =>
-          setItemParaExcluir(i)
-        }
-        onAlterarQuantidade={alterarQuantidade}
-      />
-    ))}
-  </div>
-)}
+          /* =================================================
+             GRID
+          ================================================= */
+
+          <div className="items-grid">
+            {itemsExibidos.map(
+              (item) => (
+                <ItemCard
+                  key={item.id}
+                  item={item}
+                  onEditar={(i) =>
+                    setModal({
+                      tipo: "item",
+                      item: i,
+                    })
+                  }
+                  onExcluir={(i) =>
+                    setItemParaExcluir(
+                      i
+                    )
+                  }
+                  onAlterarQuantidade={
+                    alterarQuantidade
+                  }
+                />
+              )
+            )}
+          </div>
+        )}
       </main>
 
-      {modal?.tipo === "item" && (
+      {/* =================================================
+          MODAL ITEM
+      ================================================= */}
+
+      {modal?.tipo ===
+        "item" && (
         <ItemModal
           item={modal.item}
-          onClose={() => setModal(null)}
+          onClose={() =>
+            setModal(null)
+          }
           onSaved={load}
         />
       )}
 
-      {modal?.tipo === "visual" && (
+      {/* =================================================
+          MODAL PESQUISA VISUAL
+      ================================================= */}
+
+      {modal?.tipo ===
+        "visual" && (
         <VisualSearchModal
-          onClose={() => setModal(null)}
-          onResults={(resultados) =>
-            setVisualResults(resultados)
+          onClose={() =>
+            setModal(null)
+          }
+          onResults={(
+            resultados
+          ) =>
+            setVisualResults(
+              resultados
+            )
           }
         />
       )}
+
+      {/* =================================================
+          MODAL EXCLUSÃO
+      ================================================= */}
 
       {itemParaExcluir && (
         <ModalConfirmacao
           titulo="Excluir item?"
           texto={`O item "${itemParaExcluir.nome}" será removido do estoque. Essa ação não pode ser desfeita.`}
           onCancelar={() =>
-            setItemParaExcluir(null)
+            setItemParaExcluir(
+              null
+            )
           }
-          onConfirmar={excluirItem}
+          onConfirmar={
+            excluirItem
+          }
         />
       )}
     </div>

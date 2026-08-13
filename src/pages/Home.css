@@ -1427,3 +1427,523 @@ button:disabled {
     flex-direction: column;
   }
 }
+/* =========================================================
+   CORREÇÕES DOS CARDS
+========================================================= */
+
+.item-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.item-image {
+  width: 100%;
+  height: 190px;
+  flex: 0 0 190px;
+}
+
+.item-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.item-content {
+  min-width: 0;
+}
+
+.item-title-row {
+  cursor: pointer;
+}
+
+.item-title-row > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.item-title-row h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-description {
+  overflow-wrap: anywhere;
+}
+
+.item-footer {
+  min-width: 0;
+}
+
+.quantity-buttons {
+  flex-shrink: 0;
+}
+
+.item-expanded {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #edf0f4;
+  animation: itemExpand 0.18s ease;
+}
+
+@keyframes itemExpand {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.quick-quantity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quick-quantity > span {
+  color: #737d91;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quick-quantity-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quick-quantity-controls input {
+  width: 55px;
+  height: 34px;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  outline: none;
+  text-align: center;
+}
+
+.quick-quantity-controls button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  background: white;
+  color: #4d5870;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.quick-quantity-controls button:hover {
+  background: #f3f5ff;
+  border-color: #cdd5ff;
+  color: #425bda;
+}
+
+
+/* =========================================================
+   GARANTIR QUE BOTÕES NÃO HERDEM APARÊNCIA ESTRANHA
+========================================================= */
+
+.item-card button,
+.item-card input {
+  font: inherit;
+}
+
+.item-card button {
+  cursor: pointer;
+}
+
+.item-card button:disabled {
+  cursor: not-allowed;
+}
+
+
+/* =========================================================
+   FOTO DO CARD
+========================================================= */
+
+.item-image {
+  background:
+    linear-gradient(
+      135deg,
+      #eef1f6,
+      #f8f9fb
+    );
+}
+
+.item-image img {
+  transition: transform 0.3s ease;
+}
+
+.item-card:hover .item-image img {
+  transform: scale(1.025);
+}
+
+.no-image {
+  width: 100%;
+}
+
+
+/* =========================================================
+   MODAL - GARANTIR LAYOUT
+========================================================= */
+
+.item-modal,
+.visual-modal {
+  display: flex;
+  flex-direction: column;
+}
+
+.item-modal .modal-body,
+.visual-modal .visual-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.item-modal .modal-footer,
+.visual-modal .modal-footer {
+  flex-shrink: 0;
+}
+
+
+/* =========================================================
+   INPUTS
+========================================================= */
+
+.field input,
+.field textarea {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.quantity-editor input {
+  min-width: 0;
+}
+
+.quantity-editor input::-webkit-outer-spin-button,
+.quantity-editor input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.quantity-editor input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+
+/* =========================================================
+   FOTO UPLOAD
+========================================================= */
+
+.photo-upload {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.photo-upload:focus {
+  outline: none;
+}
+
+.photo-upload:focus-visible {
+  border-color: #6278e8;
+  box-shadow:
+    0 0 0 3px
+    rgba(82, 105, 230, 0.1);
+}
+
+.photo-upload img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+
+/* =========================================================
+   VISUAL SEARCH
+========================================================= */
+
+.visual-dropzone {
+  font: inherit;
+  cursor: pointer;
+}
+
+.visual-dropzone:focus {
+  outline: none;
+}
+
+.visual-dropzone:focus-visible {
+  border-color: #6578e3;
+  box-shadow:
+    0 0 0 3px
+    rgba(82, 105, 230, 0.1);
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 750px) {
+  .items-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .item-image {
+    height: 210px;
+    flex-basis: 210px;
+  }
+
+  .item-title-row h3 {
+    white-space: normal;
+  }
+
+  .quick-quantity {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .quick-quantity-controls {
+    width: 100%;
+  }
+
+  .quick-quantity-controls input {
+    flex: 1;
+  }
+
+  .quick-quantity-controls button {
+    width: 42px;
+  }
+
+  .modal-overlay {
+    overflow-y: auto;
+  }
+
+  .item-modal,
+  .visual-modal {
+    width: 100%;
+  }
+
+  .photo-upload {
+    height: 210px;
+  }
+}
+
+@media (max-width: 450px) {
+  .main-content {
+    width: calc(100% - 20px);
+  }
+
+  .page-heading h1 {
+    font-size: 29px;
+  }
+
+  .item-content {
+    padding: 15px;
+  }
+
+  .item-footer {
+    gap: 8px;
+  }
+
+  .stock strong {
+    font-size: 20px;
+  }
+
+  .quantity-buttons {
+    gap: 5px;
+  }
+
+  .quantity-buttons button {
+    width: 32px;
+    height: 32px;
+  }
+}
+/* =========================================================
+   STATUS ONLINE / OFFLINE
+========================================================= */
+
+.topbar-status-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.topbar-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.10);
+  color: #15803d;
+}
+
+.topbar-status.offline {
+  background: rgba(239, 68, 68, 0.10);
+  color: #dc2626;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  display: inline-block;
+}
+
+.topbar-status.offline .status-dot {
+  background: #ef4444;
+}
+
+.sync-pending {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.10);
+  padding: 7px 11px;
+  border-radius: 999px;
+}
+
+/* =========================================================
+   ÚLTIMA EDIÇÃO
+========================================================= */
+
+.last-edit-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 18px 0 24px;
+  padding: 14px 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+}
+
+.last-edit-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.last-edit-icon {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: rgba(59, 130, 246, 0.10);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.last-edit-info strong {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-bottom: 3px;
+}
+
+.last-edit-info > div > span {
+  display: block;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+/* =========================================================
+   BACKUP
+========================================================= */
+
+.backup-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.backup-button {
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: #f8fafc;
+  color: #334155;
+  padding: 9px 13px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.backup-button:hover {
+  background: #f1f5f9;
+  border-color: rgba(15, 23, 42, 0.18);
+  transform: translateY(-1px);
+}
+
+.backup-button:active {
+  transform: translateY(0);
+}
+
+/* =========================================================
+   RESPONSIVO
+========================================================= */
+
+@media (max-width: 760px) {
+  .topbar-status-area {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .last-edit-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .backup-actions {
+    width: 100%;
+  }
+
+  .backup-button {
+    flex: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar-status-area {
+    gap: 6px;
+  }
+
+  .topbar-status,
+  .sync-pending {
+    font-size: 11px;
+    padding: 7px 9px;
+  }
+
+  .backup-actions {
+    flex-direction: column;
+  }
+
+  .backup-button {
+    width: 100%;
+  }
+}
