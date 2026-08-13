@@ -23,17 +23,6 @@ const CATEGORIAS = [
   },
 ];
 
-function formatarTamanho(bytes) {
-  if (!bytes) return "0 KB";
-
-  const mb = bytes / 1024 / 1024;
-
-  if (mb >= 1) {
-    return `${mb.toFixed(1)} MB`;
-  }
-
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
 
 async function arquivoParaDataURL(file) {
   return new Promise((resolve, reject) => {
@@ -150,16 +139,12 @@ function ItemModal({
   const [observacoes, setObservacoes] = useState(
     item?.observacoes || ""
   );
-  const [imagem, setImagem] = useState(item?.imagem || "");
-  const [anexos, setAnexos] = useState(
-    Array.isArray(item?.anexos) ? item.anexos : []
-  );
+  const [imagem, setImagem] = useState(item?.imagem || item?.foto || "");
 
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
   const fotoInputRef = useRef(null);
-  const anexosInputRef = useRef(null);
 
   async function selecionarFoto(e) {
     const file = e.target.files?.[0];
@@ -184,51 +169,7 @@ function ItemModal({
     e.target.value = "";
   }
 
-  async function selecionarAnexos(e) {
-    const files = Array.from(e.target.files || []);
-
-    if (!files.length) return;
-
-    try {
-      setErro("");
-
-      const novos = [];
-
-      for (const file of files) {
-        if (file.size > 10 * 1024 * 1024) {
-          setErro(
-            `O arquivo "${file.name}" ultrapassa 10 MB.`
-          );
-          continue;
-        }
-
-        const data = await arquivoParaDataURL(file);
-
-        novos.push({
-          id: `${Date.now()}-${Math.random()}`,
-          nome: file.name,
-          tipo: file.type || "application/octet-stream",
-          tamanho: file.size,
-          data,
-        });
-      }
-
-      setAnexos((anteriores) => [
-        ...anteriores,
-        ...novos,
-      ]);
-    } catch {
-      setErro("Não foi possível adicionar o anexo.");
-    }
-
-    e.target.value = "";
-  }
-
-  function removerAnexo(id) {
-    setAnexos((anteriores) =>
-      anteriores.filter((a) => a.id !== id)
-    );
-  }
+  
 
   function alterarQuantidade(valor) {
     setQuantidade((atual) =>
@@ -247,15 +188,15 @@ function ItemModal({
 
     try {
       const dados = {
-        nome: nome.trim(),
-        quantidade: Number(quantidade) || 0,
-        status,
-        tipo: status,
-        ca: status === "epi" ? ca.trim() : "",
-        observacoes: observacoes.trim(),
-        imagem,
-        anexos,
-      };
+  nome: nome.trim(),
+  quantidade: Number(quantidade) || 0,
+  status,
+  tipo: status,
+  ca: status === "epi" ? ca.trim() : "",
+  observacoes: observacoes.trim(),
+  imagem,
+  foto: imagem,
+};
 
       if (editando) {
         await api.updateItem(item.id, dados);
@@ -486,12 +427,13 @@ function ItemModal({
             </div>
 
             <input
-              ref={fotoInputRef}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={selecionarFoto}
-            />
+  ref={fotoInputRef}
+  type="file"
+  accept="image/*"
+  capture="environment"
+  hidden
+  onChange={selecionarFoto}
+/>
 
             {imagem && (
               <button
@@ -504,86 +446,7 @@ function ItemModal({
             )}
           </section>
 
-          <section className="form-section">
-            <div className="section-title">
-              <span>03</span>
-              Anexos
-            </div>
-
-            <button
-              type="button"
-              className="attachment-dropzone"
-              onClick={() =>
-                anexosInputRef.current?.click()
-              }
-            >
-              <span className="attachment-icon">
-                📎
-              </span>
-
-              <span>
-                <strong>
-                  Adicionar anexos
-                </strong>
-
-                <small>
-                  Fotos, PDFs e outros documentos
-                  até 10 MB cada
-                </small>
-              </span>
-
-              <span className="attachment-add">
-                +
-              </span>
-            </button>
-
-            <input
-              ref={anexosInputRef}
-              type="file"
-              multiple
-              hidden
-              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
-              onChange={selecionarAnexos}
-            />
-
-            {anexos.length > 0 && (
-              <div className="attachments-list">
-                {anexos.map((anexo) => (
-                  <div
-                    className="attachment-item"
-                    key={anexo.id}
-                  >
-                    <div className="attachment-file-icon">
-                      {anexo.tipo?.includes("pdf")
-                        ? "PDF"
-                        : "FILE"}
-                    </div>
-
-                    <div className="attachment-info">
-                      <strong>
-                        {anexo.nome}
-                      </strong>
-
-                      <small>
-                        {formatarTamanho(
-                          anexo.tamanho
-                        )}
-                      </small>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        removerAnexo(anexo.id)
-                      }
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          
         </div>
 
         <div className="modal-footer">
@@ -752,13 +615,14 @@ function VisualSearchModal({
             )}
           </button>
 
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={selecionar}
-          />
+         <input
+  ref={inputRef}
+  type="file"
+  accept="image/*"
+  capture="environment"
+  hidden
+  onChange={selecionar}
+/>
         </div>
 
         <div className="modal-footer">
@@ -793,11 +657,136 @@ function VisualSearchModal({
   );
 }
 
+function ItemCard({ item, onEditar, onExcluir, onAlterarQuantidade }) {
+  const [expandido, setExpandido] = useState(false);
+  const [qtdDigito, setQtdDigito] = useState(1);
+
+  const fotoExibicao = item.imagem || item.foto;
+
+  return (
+    <div className="item-card">
+      <div
+        onClick={() => setExpandido(!expandido)}
+        style={{
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          padding: "12px",
+        }}
+      >
+        <div>
+          <strong>{item.nome}</strong>
+
+          {item.ca && (
+            <span
+              style={{
+                marginLeft: "10px",
+                color: "#666",
+              }}
+            >
+              CA: {item.ca}
+            </span>
+          )}
+        </div>
+
+        <div>
+          <span>Qtd: {item.quantidade}</span>{" "}
+          {expandido ? "▲" : "▼"}
+        </div>
+      </div>
+
+      {expandido && (
+        <div
+          style={{
+            padding: "12px",
+            borderTop: "1px solid #eee",
+          }}
+        >
+          {fotoExibicao && (
+            <img
+              src={fotoExibicao}
+              alt={item.nome}
+              style={{
+                maxHeight: "150px",
+              }}
+            />
+          )}
+
+          {item.observacoes && (
+            <p>Obs: {item.observacoes}</p>
+          )}
+
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              margin: "10px 0",
+            }}
+          >
+            <input
+              type="number"
+              min="1"
+              value={qtdDigito}
+              onChange={(e) =>
+                setQtdDigito(
+                  Number(e.target.value) || 1
+                )
+              }
+              style={{
+                width: "60px",
+                textAlign: "center",
+              }}
+            />
+
+            <button
+              onClick={() =>
+                onAlterarQuantidade(
+                  item,
+                  "subtrair",
+                  qtdDigito
+                )
+              }
+            >
+              -
+            </button>
+
+            <button
+              onClick={() =>
+                onAlterarQuantidade(
+                  item,
+                  "somar",
+                  qtdDigito
+                )
+              }
+            >
+              +
+            </button>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+            }}
+          >
+            <button onClick={() => onEditar(item)}>
+              Editar
+            </button>
+
+            <button onClick={() => onExcluir(item)}>
+              Excluir
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [items, setItems] = useState([]);
   const [tab, setTab] = useState("epi");
   const [search, setSearch] = useState("");
-  const [quantidadesAlteracao, setQuantidadesAlteracao] = useState({});
 
   const [modal, setModal] = useState(null);
 
@@ -832,34 +821,27 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  async function alterarQuantidade(item, operacao) {
-  const valorEscolhido = Number(
-    quantidadesAlteracao[item.id] || 0
-  );
+  async function alterarQuantidade(item, operacao, valorEscolhido) {
+  const valor = Number(valorEscolhido || 1);
 
-  if (!Number.isInteger(valorEscolhido) || valorEscolhido <= 0) {
-    return;
-  }
+  if (!Number.isInteger(valor) || valor <= 0) return;
 
-  const delta =
-    operacao === "somar"
-      ? valorEscolhido
-      : -valorEscolhido;
+  const delta = operacao === "somar" ? valor : -valor;
 
   try {
-    const atualizado = await api.updateQty(
-      item.id,
-      delta
-    );
+    const atualizado = await api.updateQty(item.id, delta);
 
     setItems((anteriores) =>
       anteriores.map((i) =>
-        i.id === atualizado.id
+        i.id === (atualizado.id || item.id)
           ? {
               ...i,
-              quantidade: atualizado.quantidade,
-              imagem: atualizado.imagem,
-              anexos: atualizado.anexos,
+              quantidade:
+                atualizado.quantidade !== undefined
+                  ? atualizado.quantidade
+                  : i.quantidade + delta,
+              imagem: atualizado.imagem || i.imagem,
+              foto: atualizado.foto || i.foto,
             }
           : i
       )
@@ -1111,165 +1093,25 @@ export default function Home() {
               )}
           </div>
         ) : (
-          <div className="items-grid">
-            {itemsExibidos.map((item) => (
-              <article
-                className="item-card"
-                key={item.id}
-              >
-                <div className="item-image">
-                  {item.imagem ? (
-                    <img
-                      src={item.imagem}
-                      alt={item.nome}
-                    />
-                  ) : (
-                    <div className="no-image">
-                      <span>📦</span>
-                      <small>
-                        Sem foto
-                      </small>
-                    </div>
-                  )}
-
-                  <span
-                    className={`item-badge badge-${item.status || item.tipo}`}
-                  >
-                    {(
-                      item.status ||
-                      item.tipo ||
-                      "epi"
-                    ).toUpperCase()}
-                  </span>
-                </div>
-
-                <div className="item-content">
-                  <div className="item-title-row">
-                    <div>
-                      <h3>{item.nome}</h3>
-
-                      {item.ca && (
-                        <span className="ca-label">
-                          CA {item.ca}
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      className="edit-icon-button"
-                      onClick={() =>
-                        setModal({
-                          tipo: "item",
-                          item,
-                        })
-                      }
-                    >
-                      ✎
-                    </button>
-                  </div>
-
-                  {item.observacoes && (
-                    <p className="item-description">
-                      {item.observacoes}
-                    </p>
-                  )}
-
-                  {item.anexos?.length > 0 && (
-                    <div className="attachments-count">
-                      📎{" "}
-                      {item.anexos.length}{" "}
-                      {item.anexos.length === 1
-                        ? "anexo"
-                        : "anexos"}
-                    </div>
-                  )}
-
-                  <div className="item-footer">
-                    <div className="stock">
-                      <span>
-                        Quantidade
-                      </span>
-
-                      <strong>
-                        {item.quantidade}
-                      </strong>
-                    </div>
-
-                    <div className="quantity-buttons">
-  <button
-    className="qty-minus"
-    onClick={() =>
-      alterarQuantidade(item, "subtrair")
-    }
-    disabled={
-      item.quantidade <= 0 ||
-      !(Number(quantidadesAlteracao[item.id]) > 0)
-    }
-    title="Subtrair quantidade"
-  >
-    −
-  </button>
-
-  <input
-    type="number"
-    min="1"
-    step="1"
-    value={quantidadesAlteracao[item.id] || ""}
-    onChange={(e) => {
-      const valor = e.target.value;
-
-      if (valor === "") {
-        setQuantidadesAlteracao((anteriores) => ({
-          ...anteriores,
-          [item.id]: "",
-        }));
-        return;
-      }
-
-      const numero = Math.max(
-        1,
-        Math.floor(Number(valor) || 1)
-      );
-
-      setQuantidadesAlteracao((anteriores) => ({
-        ...anteriores,
-        [item.id]: numero,
-      }));
-    }}
-    placeholder="Qtd."
-    aria-label={`Quantidade para alterar ${item.nome}`}
-  />
-
-  <button
-    className="qty-plus"
-    onClick={() =>
-      alterarQuantidade(item, "somar")
-    }
-    disabled={
-      !(Number(quantidadesAlteracao[item.id]) > 0)
-    }
-    title="Somar quantidade"
-  >
-    +
-  </button>
-</div>
-                  </div>
-
-                  <button
-                    className="delete-button"
-                    onClick={() =>
-                      setItemParaExcluir(
-                        item
-                      )
-                    }
-                  >
-                    Excluir item
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
+  <div className="items-grid">
+    {itemsExibidos.map((item) => (
+      <ItemCard
+        key={item.id}
+        item={item}
+        onEditar={(i) =>
+          setModal({
+            tipo: "item",
+            item: i,
+          })
+        }
+        onExcluir={(i) =>
+          setItemParaExcluir(i)
+        }
+        onAlterarQuantidade={alterarQuantidade}
+      />
+    ))}
+  </div>
+)}
       </main>
 
       {modal?.tipo === "item" && (
