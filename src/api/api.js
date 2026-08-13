@@ -1090,49 +1090,16 @@ export const api = {
      */
 
     adicionarFila({
-  tipo: "qty",
-  id,
-  delta: valor,
-});
+      tipo: "qty",
+      id,
+      delta: valor,
+    });
 
     if (estaOnline()) {
       sincronizar();
     }
 
     return atualizado;
-  },
-
-  /* =======================================================
-     PESQUISA POR FOTO
-  ======================================================= */
-
-  async searchByImage(
-    imagem
-  ) {
-    if (!estaOnline()) {
-      throw new Error(
-        "A pesquisa por foto precisa de conexão com a internet."
-      );
-    }
-
-    const res =
-      await fetch(
-        `${API}/items/search-image`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            imagem,
-          }),
-        }
-      );
-
-    return tratarResposta(
-      res
-    );
   },
 
   /* =======================================================

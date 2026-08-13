@@ -730,11 +730,8 @@ function ItemModal({
                   </strong>
 
                   <small>
-                    A foto também
-                    será usada na
-                    pesquisa
-                    inteligente
-                    por imagem.
+                    Foto opcional do
+                    item.
                   </small>
                 </div>
               )}
@@ -808,416 +805,6 @@ function ItemModal({
 }
 
 /* =========================================================
-   PESQUISA VISUAL
-========================================================= */
-
-function VisualSearchModal({
-  onClose,
-  onResults,
-}) {
-  const inputRef =
-    useRef(null);
-
-  const [imagem, setImagem] =
-    useState("");
-
-  const [carregando, setCarregando] =
-    useState(false);
-
-  const [erro, setErro] =
-    useState("");
-
-  async function selecionar(e) {
-    const file =
-      e.target.files?.[0];
-
-    if (!file) return;
-
-    if (
-      !file.type.startsWith(
-        "image/"
-      )
-    ) {
-      setErro(
-        "Selecione uma imagem."
-      );
-
-      e.target.value = "";
-      return;
-    }
-
-    if (
-      file.size >
-      15 * 1024 * 1024
-    ) {
-      setErro(
-        "A imagem é muito grande. Escolha uma foto de até 15 MB."
-      );
-
-      e.target.value = "";
-      return;
-    }
-
-    try {
-      setErro("");
-
-      const dataUrl =
-        await imagemOtimizada(
-          file
-        );
-
-      if (
-        typeof dataUrl !==
-          "string" ||
-        !dataUrl.startsWith(
-          "data:image/"
-        )
-      ) {
-        throw new Error(
-          "Imagem inválida."
-        );
-      }
-
-      setImagem(dataUrl);
-    } catch (error) {
-      console.error(
-        "Erro ao carregar imagem:",
-        error
-      );
-
-      setErro(
-        error?.message ||
-          "Não foi possível carregar a imagem."
-      );
-    } finally {
-      e.target.value = "";
-    }
-  }
-
-  /* =======================================================
-     NORMALIZAR RESULTADOS DA API
-  ======================================================= */
-
-  function normalizarResultados(
-    resposta
-  ) {
-    let resultados = [];
-
-    if (
-      Array.isArray(
-        resposta
-      )
-    ) {
-      resultados =
-        resposta;
-    } else if (
-      Array.isArray(
-        resposta?.resultados
-      )
-    ) {
-      resultados =
-        resposta.resultados;
-    } else if (
-      Array.isArray(
-        resposta?.results
-      )
-    ) {
-      resultados =
-        resposta.results;
-    } else if (
-      Array.isArray(
-        resposta?.items
-      )
-    ) {
-      resultados =
-        resposta.items;
-    } else if (
-      Array.isArray(
-        resposta?.data
-      )
-    ) {
-      resultados =
-        resposta.data;
-    } else if (
-      Array.isArray(
-        resposta?.data?.items
-      )
-    ) {
-      resultados =
-        resposta.data.items;
-    } else if (
-      Array.isArray(
-        resposta?.data?.results
-      )
-    ) {
-      resultados =
-        resposta.data.results;
-    }
-
-    /*
-     * Alguns backends retornam:
-     *
-     * {
-     *   item: {...},
-     *   distancia: 0.12
-     * }
-     *
-     * Outros retornam o próprio item.
-     *
-     * Aqui transformamos os dois formatos
-     * em uma lista de itens.
-     */
-
-    return resultados
-      .map((resultado) => {
-        if (
-          resultado?.item &&
-          typeof resultado.item ===
-            "object"
-        ) {
-          return {
-            ...resultado.item,
-            similaridade:
-              resultado.similaridade ??
-              resultado.similarity ??
-              resultado.score,
-            distancia:
-              resultado.distancia ??
-              resultado.distance,
-          };
-        }
-
-        return resultado;
-      })
-      .filter(
-        (item) =>
-          item &&
-          typeof item ===
-            "object" &&
-          (item.id ||
-            item.nome)
-      );
-  }
-
-  /* =======================================================
-     PESQUISAR
-  ======================================================= */
-
-  async function pesquisar() {
-    if (!imagem) {
-      setErro(
-        "Selecione uma foto para pesquisar."
-      );
-      return;
-    }
-
-    if (
-      !imagem.startsWith(
-        "data:image/"
-      )
-    ) {
-      setErro(
-        "A imagem selecionada é inválida."
-      );
-      return;
-    }
-
-    setCarregando(true);
-    setErro("");
-
-    try {
-      /*
-       * Envia a imagem otimizada
-       * em Data URL/Base64.
-       */
-
-      const resposta =
-        await api.searchByImage(
-          imagem
-        );
-
-      console.log(
-        "Resposta da pesquisa visual:",
-        resposta
-      );
-
-      const resultados =
-        normalizarResultados(
-          resposta
-        );
-
-      console.log(
-        "Resultados normalizados:",
-        resultados
-      );
-
-      onResults(
-        resultados
-      );
-
-      onClose();
-    } catch (error) {
-      console.error(
-        "Erro na pesquisa visual:",
-        error
-      );
-
-      setErro(
-        error?.message ||
-          "Não foi possível realizar a pesquisa por foto."
-      );
-    } finally {
-      setCarregando(false);
-    }
-  }
-
-  return (
-    <div className="modal-overlay">
-      <div className="visual-modal">
-        <div className="modal-header">
-          <div>
-            <span className="modal-kicker">
-              INTELIGÊNCIA VISUAL
-            </span>
-
-            <h2>
-              Pesquisar por foto
-            </h2>
-
-            <p>
-              Envie uma foto e
-              encontre itens
-              visualmente
-              semelhantes.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            className="modal-close"
-            onClick={onClose}
-            disabled={
-              carregando
-            }
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="visual-body">
-          {erro && (
-            <div className="form-error">
-              <span>!</span>
-              {erro}
-            </div>
-          )}
-
-          <button
-            type="button"
-            className={`visual-dropzone ${
-              imagem
-                ? "has-image"
-                : ""
-            }`}
-            onClick={() =>
-              inputRef.current?.click()
-            }
-            disabled={
-              carregando
-            }
-          >
-            {imagem ? (
-              <img
-                src={imagem}
-                alt="Imagem da pesquisa"
-              />
-            ) : (
-              <>
-                <div className="visual-search-icon">
-                  🔎
-                </div>
-
-                <strong>
-                  Escolha uma foto
-                </strong>
-
-                <small>
-                  Por exemplo: tire
-                  uma foto de um
-                  capacete para
-                  encontrar
-                  capacetes
-                  cadastrados.
-                </small>
-              </>
-            )}
-          </button>
-
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            capture="environment"
-            hidden
-            onChange={selecionar}
-          />
-
-          {imagem && (
-            <button
-              type="button"
-              className="remove-photo"
-              onClick={() =>
-                setImagem("")
-              }
-              disabled={
-                carregando
-              }
-            >
-              Escolher outra foto
-            </button>
-          )}
-        </div>
-
-        <div className="modal-footer">
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={onClose}
-            disabled={
-              carregando
-            }
-          >
-            Cancelar
-          </button>
-
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={pesquisar}
-            disabled={
-              carregando ||
-              !imagem
-            }
-          >
-            {carregando ? (
-              <>
-                <span className="spinner" />
-                Analisando foto...
-              </>
-            ) : (
-              <>
-                🔎
-                Encontrar item
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
    CARD DO ITEM
 ========================================================= */
 
@@ -1258,10 +845,6 @@ function ItemCard({
           : "item-card-collapsed"
       }`}
     >
-      {/* =====================================================
-          CABEÇALHO SEMPRE VISÍVEL
-      ===================================================== */}
-
       <button
         type="button"
         className="item-collapsed-header"
@@ -1310,14 +893,8 @@ function ItemCard({
         </span>
       </button>
 
-      {/* =====================================================
-          INFORMAÇÕES EXPANDIDAS
-      ===================================================== */}
-
       {expandido && (
         <div className="item-expanded-content">
-          {/* FOTO */}
-
           <div className="item-image">
             {fotoExibicao ? (
               <img
@@ -1347,8 +924,6 @@ function ItemCard({
               {categoriaNome}
             </span>
           </div>
-
-          {/* INFORMAÇÕES */}
 
           <div className="item-content">
             <div className="item-title-row">
@@ -1407,8 +982,6 @@ function ItemCard({
                 </span>
               )}
 
-            {/* ESTOQUE */}
-
             <div className="item-footer">
               <div className="stock">
                 <span>
@@ -1421,11 +994,6 @@ function ItemCard({
                   ) || 0}
                 </strong>
               </div>
-
-              {/* =================================================
-                  BOTÕES PRINCIPAIS + E -
-                  AGORA PEDEM O NÚMERO AO CLICAR
-              ================================================= */}
 
               <div
                 className="quantity-buttons"
@@ -1472,8 +1040,6 @@ function ItemCard({
               </div>
             </div>
 
-            {/* EXCLUIR */}
-
             <button
               type="button"
               className="delete-button"
@@ -1511,11 +1077,6 @@ export default function Home() {
   const [
     itemParaExcluir,
     setItemParaExcluir,
-  ] = useState(null);
-
-  const [
-    visualResults,
-    setVisualResults,
   ] = useState(null);
 
   const [
@@ -1841,14 +1402,6 @@ export default function Home() {
     operacao,
     valorEscolhido
   ) {
-    /*
-     * Se o valor não foi informado,
-     * significa que o usuário clicou
-     * diretamente no + ou no -.
-     *
-     * Nesse caso pedimos o número.
-     */
-
     let valor =
       valorEscolhido;
 
@@ -1865,9 +1418,6 @@ export default function Home() {
           "1"
         );
 
-      /*
-       * Cancelou o prompt.
-       */
       if (
         resposta === null
       ) {
@@ -1888,11 +1438,6 @@ export default function Home() {
         Number(texto);
     }
 
-    /*
-     * Aceitamos somente
-     * números inteiros positivos.
-     */
-
     if (
       !Number.isInteger(
         Number(valor)
@@ -1907,11 +1452,6 @@ export default function Home() {
 
     valor =
       Number(valor);
-
-    /*
-     * Impede retirar mais do que
-     * existe no estoque.
-     */
 
     if (
       operacao ===
@@ -2014,13 +1554,6 @@ export default function Home() {
 
   const itemsExibidos =
     useMemo(() => {
-      if (
-        visualResults !==
-        null
-      ) {
-        return visualResults;
-      }
-
       return items.filter(
         (item) =>
           (item.status ||
@@ -2030,7 +1563,6 @@ export default function Home() {
     }, [
       items,
       tab,
-      visualResults,
     ]);
 
   const contadores =
@@ -2060,12 +1592,6 @@ export default function Home() {
           ).length,
       };
     }, [items]);
-
-  function limparPesquisaVisual() {
-    setVisualResults(
-      null
-    );
-  }
 
   /* =======================================================
      RENDER
@@ -2215,15 +1741,11 @@ export default function Home() {
 
             <input
               value={search}
-              onChange={(e) => {
+              onChange={(e) =>
                 setSearch(
                   e.target.value
-                );
-
-                setVisualResults(
-                  null
-                );
-              }}
+                )
+              }
               placeholder="Pesquisar por nome, CA ou observação..."
             />
 
@@ -2238,94 +1760,49 @@ export default function Home() {
               </button>
             )}
           </div>
-
-          <button
-            type="button"
-            className="photo-search-button"
-            onClick={() =>
-              setModal({
-                tipo: "visual",
-              })
-            }
-          >
-            <span>📷</span>
-            Pesquisar por foto
-          </button>
         </div>
 
-        {visualResults !==
-          null && (
-          <div className="visual-results-banner">
-            <div>
-              <strong>
-                Resultados da pesquisa
-                visual
-              </strong>
-
-              <span>
-                Foram encontrados{" "}
-                {
-                  visualResults.length
-                }{" "}
-                itens semelhantes.
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={
-                limparPesquisaVisual
-              }
-            >
-              Voltar ao estoque
-            </button>
-          </div>
-        )}
-
-        {visualResults ===
-          null && (
-          <div className="tabs">
-            {CATEGORIAS.map(
-              (categoria) => (
-                <button
-                  type="button"
-                  key={
+        <div className="tabs">
+          {CATEGORIAS.map(
+            (categoria) => (
+              <button
+                type="button"
+                key={
+                  categoria.id
+                }
+                className={
+                  tab ===
+                  categoria.id
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  setTab(
                     categoria.id
-                  }
-                  className={
-                    tab ===
-                    categoria.id
-                      ? "active"
-                      : ""
-                  }
-                  onClick={() =>
-                    setTab(
-                      categoria.id
-                    )
-                  }
-                >
-                  <span>
-                    {
-                      categoria.icone
-                    }
-                  </span>
-
+                  )
+                }
+              >
+                <span>
                   {
-                    categoria.nome
+                    categoria.icone
                   }
+                </span>
 
-                  <small>
-                    {
-                      contadores[
-                        categoria.id
-                      ]
-                    }
-                  </small>
-                </button>
-              )
-            )}
-          </div>
-        )}
+                {
+                  categoria.nome
+                }
+
+                <small>
+                  {
+                    contadores[
+                      categoria.id
+                    ]
+                  }
+                </small>
+              </button>
+            )
+          )}
+        </div>
 
         {carregando ? (
           <div className="loading-state">
@@ -2347,31 +1824,26 @@ export default function Home() {
             </h2>
 
             <p>
-              {visualResults !==
-              null
-                ? "Não encontramos itens visualmente semelhantes a essa foto."
-                : search
+              {search
                 ? "Tente pesquisar por outro termo."
                 : "Comece cadastrando seu primeiro item."}
             </p>
 
-            {visualResults ===
-              null &&
-              !search && (
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() =>
-                    setModal({
-                      tipo: "item",
-                      item: null,
-                    })
-                  }
-                >
-                  + Cadastrar primeiro
-                  item
-                </button>
-              )}
+            {!search && (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() =>
+                  setModal({
+                    tipo: "item",
+                    item: null,
+                  })
+                }
+              >
+                + Cadastrar primeiro
+                item
+              </button>
+            )}
           </div>
         ) : (
           <div className="items-grid">
@@ -2409,22 +1881,6 @@ export default function Home() {
             setModal(null)
           }
           onSaved={load}
-        />
-      )}
-
-      {modal?.tipo ===
-        "visual" && (
-        <VisualSearchModal
-          onClose={() =>
-            setModal(null)
-          }
-          onResults={(
-            resultados
-          ) =>
-            setVisualResults(
-              resultados
-            )
-          }
         />
       )}
 
