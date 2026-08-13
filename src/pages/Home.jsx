@@ -797,6 +797,7 @@ export default function Home() {
   const [items, setItems] = useState([]);
   const [tab, setTab] = useState("epi");
   const [search, setSearch] = useState("");
+  const [quantidadesAlteracao, setQuantidadesAlteracao] = useState({});
 
   const [modal, setModal] = useState(null);
 
@@ -831,29 +832,42 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  async function alterarQuantidade(item, delta) {
-    try {
-      const atualizado =
-        await api.updateQty(
-          item.id,
-          delta
-        );
+  async function alterarQuantidade(item, operacao) {
+  const valorEscolhido = Number(
+    quantidadesAlteracao[item.id] || 0
+  );
 
-      setItems((anteriores) =>
-        anteriores.map((i) =>
-          i.id === atualizado.id
-            ? {
-                ...i,
-                quantidade:
-                  atualizado.quantidade,
-              }
-            : i
-        )
-      );
-    } catch (error) {
-      console.error(error);
-    }
+  if (!Number.isInteger(valorEscolhido) || valorEscolhido <= 0) {
+    return;
   }
+
+  const delta =
+    operacao === "somar"
+      ? valorEscolhido
+      : -valorEscolhido;
+
+  try {
+    const atualizado = await api.updateQty(
+      item.id,
+      delta
+    );
+
+    setItems((anteriores) =>
+      anteriores.map((i) =>
+        i.id === atualizado.id
+          ? {
+              ...i,
+              quantidade: atualizado.quantidade,
+              imagem: atualizado.imagem,
+              anexos: atualizado.anexos,
+            }
+          : i
+      )
+    );
+  } catch (error) {
+    console.error(error);
+  }
+}
 
   async function excluirItem() {
     if (!itemParaExcluir) return;
@@ -1182,37 +1196,63 @@ export default function Home() {
                     </div>
 
                     <div className="quantity-buttons">
-                      <button
-                        className="qty-minus"
-                        onClick={() =>
-                          alterarQuantidade(
-                            item,
-                            -1
-                          )
-                        }
-                        disabled={
-                          item.quantidade <= 0
-                        }
-                      >
-                        −
-                      </button>
+  <button
+    className="qty-minus"
+    onClick={() =>
+      alterarQuantidade(item, "subtrair")
+    }
+    disabled={
+      item.quantidade <= 0 ||
+      !(Number(quantidadesAlteracao[item.id]) > 0)
+    }
+    title="Subtrair quantidade"
+  >
+    −
+  </button>
 
-                      <span>
-                        {item.quantidade}
-                      </span>
+  <input
+    type="number"
+    min="1"
+    step="1"
+    value={quantidadesAlteracao[item.id] || ""}
+    onChange={(e) => {
+      const valor = e.target.value;
 
-                      <button
-                        className="qty-plus"
-                        onClick={() =>
-                          alterarQuantidade(
-                            item,
-                            1
-                          )
-                        }
-                      >
-                        +
-                      </button>
-                    </div>
+      if (valor === "") {
+        setQuantidadesAlteracao((anteriores) => ({
+          ...anteriores,
+          [item.id]: "",
+        }));
+        return;
+      }
+
+      const numero = Math.max(
+        1,
+        Math.floor(Number(valor) || 1)
+      );
+
+      setQuantidadesAlteracao((anteriores) => ({
+        ...anteriores,
+        [item.id]: numero,
+      }));
+    }}
+    placeholder="Qtd."
+    aria-label={`Quantidade para alterar ${item.nome}`}
+  />
+
+  <button
+    className="qty-plus"
+    onClick={() =>
+      alterarQuantidade(item, "somar")
+    }
+    disabled={
+      !(Number(quantidadesAlteracao[item.id]) > 0)
+    }
+    title="Somar quantidade"
+  >
+    +
+  </button>
+</div>
                   </div>
 
                   <button
