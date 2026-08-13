@@ -4,6 +4,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+
 import { api } from "../api/api";
 import "./Home.css";
 
@@ -36,10 +37,28 @@ async function arquivoParaDataURL(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
-    reader.onload = () => resolve(reader.result);
+    reader.onload = () => {
+      if (
+        typeof reader.result !== "string" ||
+        !reader.result.startsWith("data:")
+      ) {
+        reject(
+          new Error(
+            "Não foi possível converter o arquivo."
+          )
+        );
+        return;
+      }
+
+      resolve(reader.result);
+    };
 
     reader.onerror = () =>
-      reject(new Error("Erro ao ler arquivo."));
+      reject(
+        new Error(
+          "Erro ao ler arquivo."
+        )
+      );
 
     reader.readAsDataURL(file);
   });
@@ -51,121 +70,136 @@ async function arquivoParaDataURL(file) {
 
 async function imagemOtimizada(file) {
   if (!file) {
-    throw new Error("Arquivo não informado.");
+    throw new Error(
+      "Arquivo não informado."
+    );
   }
 
-  if (!file.type.startsWith("image/")) {
+  if (
+    !file.type ||
+    !file.type.startsWith("image/")
+  ) {
     return arquivoParaDataURL(file);
   }
 
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
+  return new Promise(
+    (resolve, reject) => {
+      const reader =
+        new FileReader();
 
-    reader.onload = () => {
-      const img = new Image();
+      reader.onload = () => {
+        const img =
+          new Image();
 
-      img.onload = () => {
-        const limite = 1000;
+        img.onload = () => {
+          const limite = 1000;
 
-        let width =
-          img.naturalWidth || img.width;
+          let width =
+            img.naturalWidth ||
+            img.width;
 
-        let height =
-          img.naturalHeight || img.height;
+          let height =
+            img.naturalHeight ||
+            img.height;
 
-        if (!width || !height) {
-          reject(
-            new Error(
-              "Não foi possível identificar a imagem."
-            )
-          );
-          return;
-        }
-
-        if (
-          width > limite ||
-          height > limite
-        ) {
-          if (width > height) {
-            height = Math.round(
-              (height * limite) / width
+          if (!width || !height) {
+            reject(
+              new Error(
+                "Não foi possível identificar a imagem."
+              )
             );
-
-            width = limite;
-          } else {
-            width = Math.round(
-              (width * limite) / height
-            );
-
-            height = limite;
+            return;
           }
-        }
 
-        const canvas =
-          document.createElement(
-            "canvas"
+          if (
+            width > limite ||
+            height > limite
+          ) {
+            if (width > height) {
+              height = Math.round(
+                (height * limite) /
+                  width
+              );
+
+              width = limite;
+            } else {
+              width = Math.round(
+                (width * limite) /
+                  height
+              );
+
+              height = limite;
+            }
+          }
+
+          const canvas =
+            document.createElement(
+              "canvas"
+            );
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx =
+            canvas.getContext("2d");
+
+          if (!ctx) {
+            reject(
+              new Error(
+                "Não foi possível processar a imagem."
+              )
+            );
+            return;
+          }
+
+          ctx.fillStyle =
+            "#ffffff";
+
+          ctx.fillRect(
+            0,
+            0,
+            width,
+            height
           );
 
-        canvas.width = width;
-        canvas.height = height;
+          ctx.drawImage(
+            img,
+            0,
+            0,
+            width,
+            height
+          );
 
-        const ctx =
-          canvas.getContext("2d");
+          const resultado =
+            canvas.toDataURL(
+              "image/jpeg",
+              0.72
+            );
 
-        if (!ctx) {
+          resolve(resultado);
+        };
+
+        img.onerror = () =>
           reject(
             new Error(
-              "Não foi possível processar a imagem."
+              "Não foi possível carregar a imagem."
             )
           );
-          return;
-        }
 
-        ctx.fillStyle = "#ffffff";
-
-        ctx.fillRect(
-          0,
-          0,
-          width,
-          height
-        );
-
-        ctx.drawImage(
-          img,
-          0,
-          0,
-          width,
-          height
-        );
-
-        const resultado =
-          canvas.toDataURL(
-            "image/jpeg",
-            0.72
-          );
-
-        resolve(resultado);
+        img.src =
+          reader.result;
       };
 
-      img.onerror = () =>
+      reader.onerror = () =>
         reject(
           new Error(
-            "Não foi possível carregar a imagem."
+            "Não foi possível ler a imagem."
           )
         );
 
-      img.src = reader.result;
-    };
-
-    reader.onerror = () =>
-      reject(
-        new Error(
-          "Não foi possível ler a imagem."
-        )
-      );
-
-    reader.readAsDataURL(file);
-  });
+      reader.readAsDataURL(file);
+    }
+  );
 }
 
 /* =========================================================
@@ -220,15 +254,19 @@ function ItemModal({
   onClose,
   onSaved,
 }) {
-  const editando = Boolean(item);
+  const editando =
+    Boolean(item);
 
-  const [nome, setNome] = useState(
-    item?.nome || ""
-  );
+  const [nome, setNome] =
+    useState(
+      item?.nome || ""
+    );
 
   const [quantidade, setQuantidade] =
     useState(
-      Number(item?.quantidade) || 0
+      Number(
+        item?.quantidade
+      ) || 0
     );
 
   const [status, setStatus] =
@@ -238,9 +276,10 @@ function ItemModal({
         "epi"
     );
 
-  const [ca, setCa] = useState(
-    item?.ca || ""
-  );
+  const [ca, setCa] =
+    useState(
+      item?.ca || ""
+    );
 
   const [observacoes, setObservacoes] =
     useState(
@@ -271,9 +310,7 @@ function ItemModal({
     const file =
       e.target.files?.[0];
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     if (
       !file.type.startsWith(
@@ -285,7 +322,6 @@ function ItemModal({
       );
 
       e.target.value = "";
-
       return;
     }
 
@@ -298,7 +334,6 @@ function ItemModal({
       );
 
       e.target.value = "";
-
       return;
     }
 
@@ -338,12 +373,10 @@ function ItemModal({
   }
 
   /* =======================================================
-     QUANTIDADE
+     QUANTIDADE NO CADASTRO
   ======================================================= */
 
-  function alterarQuantidade(
-    valor
-  ) {
+  function alterarQuantidade(valor) {
     setQuantidade(
       (atual) =>
         Math.max(
@@ -363,7 +396,6 @@ function ItemModal({
       setErro(
         "Digite o nome do item."
       );
-
       return;
     }
 
@@ -469,7 +501,6 @@ function ItemModal({
           {erro && (
             <div className="form-error">
               <span>!</span>
-
               {erro}
             </div>
           )}
@@ -477,7 +508,6 @@ function ItemModal({
           <section className="form-section">
             <div className="section-title">
               <span>01</span>
-
               Informações básicas
             </div>
 
@@ -628,8 +658,7 @@ function ItemModal({
                   }
                   onChange={(e) =>
                     setObservacoes(
-                      e.target
-                        .value
+                      e.target.value
                     )
                   }
                   placeholder="Informações adicionais sobre o item..."
@@ -642,7 +671,6 @@ function ItemModal({
           <section className="form-section">
             <div className="section-title">
               <span>02</span>
-
               Foto do item
             </div>
 
@@ -686,7 +714,8 @@ function ItemModal({
 
                     <small>
                       Clique para
-                      selecionar outra
+                      selecionar
+                      outra
                     </small>
                   </div>
                 </>
@@ -704,15 +733,17 @@ function ItemModal({
                     A foto também
                     será usada na
                     pesquisa
-                    inteligente por
-                    imagem.
+                    inteligente
+                    por imagem.
                   </small>
                 </div>
               )}
             </div>
 
             <input
-              ref={fotoInputRef}
+              ref={
+                fotoInputRef
+              }
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
               capture="environment"
@@ -741,7 +772,9 @@ function ItemModal({
             type="button"
             className="btn-secondary"
             onClick={onClose}
-            disabled={salvando}
+            disabled={
+              salvando
+            }
           >
             Cancelar
           </button>
@@ -750,18 +783,18 @@ function ItemModal({
             type="button"
             className="btn-primary"
             onClick={salvar}
-            disabled={salvando}
+            disabled={
+              salvando
+            }
           >
             {salvando ? (
               <>
                 <span className="spinner" />
-
                 Salvando...
               </>
             ) : (
               <>
                 ✓
-
                 {editando
                   ? "Salvar alterações"
                   : "Cadastrar item"}
@@ -798,9 +831,7 @@ function VisualSearchModal({
     const file =
       e.target.files?.[0];
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     if (
       !file.type.startsWith(
@@ -812,7 +843,6 @@ function VisualSearchModal({
       );
 
       e.target.value = "";
-
       return;
     }
 
@@ -825,7 +855,6 @@ function VisualSearchModal({
       );
 
       e.target.value = "";
-
       return;
     }
 
@@ -837,26 +866,159 @@ function VisualSearchModal({
           file
         );
 
+      if (
+        typeof dataUrl !==
+          "string" ||
+        !dataUrl.startsWith(
+          "data:image/"
+        )
+      ) {
+        throw new Error(
+          "Imagem inválida."
+        );
+      }
+
       setImagem(dataUrl);
     } catch (error) {
       console.error(
+        "Erro ao carregar imagem:",
         error
       );
 
       setErro(
-        "Não foi possível carregar a imagem."
+        error?.message ||
+          "Não foi possível carregar a imagem."
       );
     } finally {
       e.target.value = "";
     }
   }
 
+  /* =======================================================
+     NORMALIZAR RESULTADOS DA API
+  ======================================================= */
+
+  function normalizarResultados(
+    resposta
+  ) {
+    let resultados = [];
+
+    if (
+      Array.isArray(
+        resposta
+      )
+    ) {
+      resultados =
+        resposta;
+    } else if (
+      Array.isArray(
+        resposta?.resultados
+      )
+    ) {
+      resultados =
+        resposta.resultados;
+    } else if (
+      Array.isArray(
+        resposta?.results
+      )
+    ) {
+      resultados =
+        resposta.results;
+    } else if (
+      Array.isArray(
+        resposta?.items
+      )
+    ) {
+      resultados =
+        resposta.items;
+    } else if (
+      Array.isArray(
+        resposta?.data
+      )
+    ) {
+      resultados =
+        resposta.data;
+    } else if (
+      Array.isArray(
+        resposta?.data?.items
+      )
+    ) {
+      resultados =
+        resposta.data.items;
+    } else if (
+      Array.isArray(
+        resposta?.data?.results
+      )
+    ) {
+      resultados =
+        resposta.data.results;
+    }
+
+    /*
+     * Alguns backends retornam:
+     *
+     * {
+     *   item: {...},
+     *   distancia: 0.12
+     * }
+     *
+     * Outros retornam o próprio item.
+     *
+     * Aqui transformamos os dois formatos
+     * em uma lista de itens.
+     */
+
+    return resultados
+      .map((resultado) => {
+        if (
+          resultado?.item &&
+          typeof resultado.item ===
+            "object"
+        ) {
+          return {
+            ...resultado.item,
+            similaridade:
+              resultado.similaridade ??
+              resultado.similarity ??
+              resultado.score,
+            distancia:
+              resultado.distancia ??
+              resultado.distance,
+          };
+        }
+
+        return resultado;
+      })
+      .filter(
+        (item) =>
+          item &&
+          typeof item ===
+            "object" &&
+          (item.id ||
+            item.nome)
+      );
+  }
+
+  /* =======================================================
+     PESQUISAR
+  ======================================================= */
+
   async function pesquisar() {
     if (!imagem) {
       setErro(
         "Selecione uma foto para pesquisar."
       );
+      return;
+    }
 
+    if (
+      !imagem.startsWith(
+        "data:image/"
+      )
+    ) {
+      setErro(
+        "A imagem selecionada é inválida."
+      );
       return;
     }
 
@@ -864,17 +1026,33 @@ function VisualSearchModal({
     setErro("");
 
     try {
+      /*
+       * Envia a imagem otimizada
+       * em Data URL/Base64.
+       */
+
       const resposta =
         await api.searchByImage(
           imagem
         );
 
+      console.log(
+        "Resposta da pesquisa visual:",
+        resposta
+      );
+
+      const resultados =
+        normalizarResultados(
+          resposta
+        );
+
+      console.log(
+        "Resultados normalizados:",
+        resultados
+      );
+
       onResults(
-        Array.isArray(
-          resposta?.resultados
-        )
-          ? resposta.resultados
-          : []
+        resultados
       );
 
       onClose();
@@ -886,7 +1064,7 @@ function VisualSearchModal({
 
       setErro(
         error?.message ||
-          "Erro na pesquisa visual."
+          "Não foi possível realizar a pesquisa por foto."
       );
     } finally {
       setCarregando(false);
@@ -907,8 +1085,9 @@ function VisualSearchModal({
             </h2>
 
             <p>
-              Envie uma foto e encontre
-              itens visualmente
+              Envie uma foto e
+              encontre itens
+              visualmente
               semelhantes.
             </p>
           </div>
@@ -917,7 +1096,9 @@ function VisualSearchModal({
             type="button"
             className="modal-close"
             onClick={onClose}
-            disabled={carregando}
+            disabled={
+              carregando
+            }
           >
             ×
           </button>
@@ -927,7 +1108,6 @@ function VisualSearchModal({
           {erro && (
             <div className="form-error">
               <span>!</span>
-
               {erro}
             </div>
           )}
@@ -942,11 +1122,14 @@ function VisualSearchModal({
             onClick={() =>
               inputRef.current?.click()
             }
+            disabled={
+              carregando
+            }
           >
             {imagem ? (
               <img
                 src={imagem}
-                alt="Pesquisa"
+                alt="Imagem da pesquisa"
               />
             ) : (
               <>
@@ -959,10 +1142,12 @@ function VisualSearchModal({
                 </strong>
 
                 <small>
-                  Por exemplo: tire uma
-                  foto de um capacete
-                  para encontrar
-                  capacetes cadastrados.
+                  Por exemplo: tire
+                  uma foto de um
+                  capacete para
+                  encontrar
+                  capacetes
+                  cadastrados.
                 </small>
               </>
             )}
@@ -974,10 +1159,23 @@ function VisualSearchModal({
             accept="image/jpeg,image/png,image/webp,image/gif"
             capture="environment"
             hidden
-            onChange={
-              selecionar
-            }
+            onChange={selecionar}
           />
+
+          {imagem && (
+            <button
+              type="button"
+              className="remove-photo"
+              onClick={() =>
+                setImagem("")
+              }
+              disabled={
+                carregando
+              }
+            >
+              Escolher outra foto
+            </button>
+          )}
         </div>
 
         <div className="modal-footer">
@@ -985,7 +1183,9 @@ function VisualSearchModal({
             type="button"
             className="btn-secondary"
             onClick={onClose}
-            disabled={carregando}
+            disabled={
+              carregando
+            }
           >
             Cancelar
           </button>
@@ -1002,13 +1202,11 @@ function VisualSearchModal({
             {carregando ? (
               <>
                 <span className="spinner" />
-
                 Analisando foto...
               </>
             ) : (
               <>
                 🔎
-
                 Encontrar item
               </>
             )}
@@ -1032,9 +1230,6 @@ function ItemCard({
   const [expandido, setExpandido] =
     useState(false);
 
-  const [qtdDigito, setQtdDigito] =
-    useState(1);
-
   const fotoExibicao =
     item.imagem ||
     item.foto ||
@@ -1045,99 +1240,55 @@ function ItemCard({
     item.tipo ||
     "epi";
 
-  const categoriaNome =
+  const categoriaInfo =
     CATEGORIAS.find(
       (c) =>
         c.id === categoria
-    )?.nome ||
+    );
+
+  const categoriaNome =
+    categoriaInfo?.nome ||
     "EPI";
 
   return (
-    <article className="item-card">
-      <div className="item-image">
-        {fotoExibicao ? (
-          <img
-            src={fotoExibicao}
-            alt={item.nome}
-            loading="lazy"
-          />
-        ) : (
-          <div className="no-image">
-            <span>📦</span>
+    <article
+      className={`item-card ${
+        expandido
+          ? "item-card-expanded"
+          : "item-card-collapsed"
+      }`}
+    >
+      {/* =====================================================
+          CABEÇALHO SEMPRE VISÍVEL
+      ===================================================== */}
 
-            <small>
-              Sem foto
-            </small>
-          </div>
-        )}
-
-        <span
-          className={`item-badge badge-${categoria}`}
-        >
-          {categoriaNome}
-        </span>
-      </div>
-
-      <div className="item-content">
-        <div
-          className="item-title-row"
-          onClick={() =>
-            setExpandido(
-              !expandido
-            )
-          }
-        >
-          <div>
+      <button
+        type="button"
+        className="item-collapsed-header"
+        onClick={() =>
+          setExpandido(
+            (atual) => !atual
+          )
+        }
+      >
+        <div className="collapsed-main">
+          <div className="collapsed-title">
             <h3>
               {item.nome}
             </h3>
 
-            {item.ca && (
-              <span className="ca-label">
-                CA: {item.ca}
-              </span>
-            )}
+            {categoria ===
+              "epi" &&
+              item.ca && (
+                <span className="ca-label">
+                  CA: {item.ca}
+                </span>
+              )}
           </div>
 
-          <button
-            type="button"
-            className="edit-icon-button"
-            title="Editar item"
-            onClick={(e) => {
-              e.stopPropagation();
-
-              onEditar(item);
-            }}
-          >
-            ✎
-          </button>
-        </div>
-
-        <p className="item-description">
-          {item.observacoes ||
-            "Nenhuma observação cadastrada."}
-        </p>
-
-        {Array.isArray(
-          item.anexos
-        ) &&
-          item.anexos.length >
-            0 && (
-            <span className="attachments-count">
-              📎{" "}
-              {item.anexos.length}{" "}
-              anexo
-              {item.anexos.length !==
-              1
-                ? "s"
-                : ""}
-            </span>
-          )}
-
-        <div className="item-footer">
-          <div className="stock">
+          <div className="collapsed-stock">
             <span>
-              Estoque
+              Quantidade
             </span>
 
             <strong>
@@ -1146,119 +1297,196 @@ function ItemCard({
               ) || 0}
             </strong>
           </div>
-
-          <div
-            className="quantity-buttons"
-            onClick={(e) =>
-              e.stopPropagation()
-            }
-          >
-            <button
-              type="button"
-              onClick={() =>
-                onAlterarQuantidade(
-                  item,
-                  "subtrair",
-                  1
-                )
-              }
-              disabled={
-                Number(
-                  item.quantidade
-                ) <= 0
-              }
-            >
-              −
-            </button>
-
-            <span>
-              {Number(
-                item.quantidade
-              ) || 0}
-            </span>
-
-            <button
-              type="button"
-              onClick={() =>
-                onAlterarQuantidade(
-                  item,
-                  "somar",
-                  1
-                )
-              }
-            >
-              +
-            </button>
-          </div>
         </div>
 
-        {expandido && (
-          <div className="item-expanded">
-            <div className="quick-quantity">
-              <span>
-                Alterar quantidade
-              </span>
+        <span
+          className={`expand-arrow ${
+            expandido
+              ? "open"
+              : ""
+          }`}
+        >
+          ›
+        </span>
+      </button>
 
-              <div className="quick-quantity-controls">
-                <input
-                  type="number"
-                  min="1"
-                  value={
-                    qtdDigito
-                  }
-                  onChange={(e) =>
-                    setQtdDigito(
-                      Math.max(
-                        1,
-                        Number(
-                          e.target
-                            .value
-                        ) || 1
-                      )
-                    )
-                  }
-                />
+      {/* =====================================================
+          INFORMAÇÕES EXPANDIDAS
+      ===================================================== */}
 
+      {expandido && (
+        <div className="item-expanded-content">
+          {/* FOTO */}
+
+          <div className="item-image">
+            {fotoExibicao ? (
+              <img
+                src={
+                  fotoExibicao
+                }
+                alt={
+                  item.nome
+                }
+                loading="lazy"
+              />
+            ) : (
+              <div className="no-image">
+                <span>
+                  📦
+                </span>
+
+                <small>
+                  Sem foto
+                </small>
+              </div>
+            )}
+
+            <span
+              className={`item-badge badge-${categoria}`}
+            >
+              {categoriaNome}
+            </span>
+          </div>
+
+          {/* INFORMAÇÕES */}
+
+          <div className="item-content">
+            <div className="item-title-row">
+              <div>
+                <h3>
+                  {item.nome}
+                </h3>
+
+                {categoria ===
+                  "epi" &&
+                  item.ca && (
+                    <span className="ca-label">
+                      CA: {item.ca}
+                    </span>
+                  )}
+              </div>
+
+              <button
+                type="button"
+                className="edit-icon-button"
+                title="Editar item"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditar(item);
+                }}
+              >
+                ✎
+              </button>
+            </div>
+
+            <p className="item-description">
+              {item.observacoes ||
+                "Nenhuma observação cadastrada."}
+            </p>
+
+            {Array.isArray(
+              item.anexos
+            ) &&
+              item.anexos
+                .length >
+                0 && (
+                <span className="attachments-count">
+                  📎{" "}
+                  {
+                    item
+                      .anexos
+                      .length
+                  }{" "}
+                  anexo
+                  {item
+                    .anexos
+                    .length !==
+                  1
+                    ? "s"
+                    : ""}
+                </span>
+              )}
+
+            {/* ESTOQUE */}
+
+            <div className="item-footer">
+              <div className="stock">
+                <span>
+                  Estoque
+                </span>
+
+                <strong>
+                  {Number(
+                    item.quantidade
+                  ) || 0}
+                </strong>
+              </div>
+
+              {/* =================================================
+                  BOTÕES PRINCIPAIS + E -
+                  AGORA PEDEM O NÚMERO AO CLICAR
+              ================================================= */}
+
+              <div
+                className="quantity-buttons"
+                onClick={(e) =>
+                  e.stopPropagation()
+                }
+              >
                 <button
                   type="button"
                   onClick={() =>
                     onAlterarQuantidade(
                       item,
-                      "subtrair",
-                      qtdDigito
+                      "subtrair"
                     )
                   }
+                  disabled={
+                    Number(
+                      item.quantidade
+                    ) <= 0
+                  }
+                  title="Retirar quantidade"
                 >
                   −
                 </button>
 
+                <span>
+                  {Number(
+                    item.quantidade
+                  ) || 0}
+                </span>
+
                 <button
                   type="button"
                   onClick={() =>
                     onAlterarQuantidade(
                       item,
-                      "somar",
-                      qtdDigito
+                      "somar"
                     )
                   }
+                  title="Adicionar quantidade"
                 >
                   +
                 </button>
               </div>
             </div>
 
+            {/* EXCLUIR */}
+
             <button
               type="button"
               className="delete-button"
-              onClick={() =>
-                onExcluir(item)
-              }
+              onClick={(e) => {
+                e.stopPropagation();
+                onExcluir(item);
+              }}
             >
               🗑 Excluir item
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </article>
   );
 }
@@ -1296,7 +1524,7 @@ export default function Home() {
   ] = useState(false);
 
   /* =======================================================
-     STATUS ONLINE / OFFLINE
+     STATUS
   ======================================================= */
 
   const [online, setOnline] =
@@ -1307,10 +1535,8 @@ export default function Home() {
         : true
     );
 
-  const [
-    pendentes,
-    setPendentes,
-  ] = useState(0);
+  const [pendentes, setPendentes] =
+    useState(0);
 
   const [
     ultimaEdicao,
@@ -1319,10 +1545,6 @@ export default function Home() {
 
   const importInputRef =
     useRef(null);
-
-  /* =======================================================
-     ATUALIZAR STATUS
-  ======================================================= */
 
   function atualizarStatus() {
     if (
@@ -1346,31 +1568,19 @@ export default function Home() {
   useEffect(() => {
     atualizarStatus();
 
-    function quandoOnline() {
-      atualizarStatus();
-    }
-
-    function quandoOffline() {
-      atualizarStatus();
-    }
-
-    function quandoEstoqueAtualizado() {
-      atualizarStatus();
-    }
-
     window.addEventListener(
       "online",
-      quandoOnline
+      atualizarStatus
     );
 
     window.addEventListener(
       "offline",
-      quandoOffline
+      atualizarStatus
     );
 
     window.addEventListener(
       "estoque-atualizado",
-      quandoEstoqueAtualizado
+      atualizarStatus
     );
 
     const intervalo =
@@ -1382,17 +1592,17 @@ export default function Home() {
     return () => {
       window.removeEventListener(
         "online",
-        quandoOnline
+        atualizarStatus
       );
 
       window.removeEventListener(
         "offline",
-        quandoOffline
+        atualizarStatus
       );
 
       window.removeEventListener(
         "estoque-atualizado",
-        quandoEstoqueAtualizado
+        atualizarStatus
       );
 
       clearInterval(
@@ -1402,7 +1612,7 @@ export default function Home() {
   }, []);
 
   /* =======================================================
-     FORMATAR ÚLTIMA EDIÇÃO
+     ÚLTIMA EDIÇÃO
   ======================================================= */
 
   function formatarUltimaEdicao(
@@ -1437,148 +1647,7 @@ export default function Home() {
   }
 
   /* =======================================================
-     CARREGAR
-  ======================================================= */
-
-  async function load() {
-    try {
-      setCarregando(true);
-
-      const data =
-        await api.getItems(
-          search
-        );
-
-      setItems(
-        Array.isArray(data)
-          ? data
-          : []
-      );
-
-      atualizarStatus();
-    } catch (error) {
-      console.error(
-        "Erro ao carregar itens:",
-        error
-      );
-    } finally {
-      setCarregando(false);
-    }
-  }
-
-  useEffect(() => {
-    const timer =
-      setTimeout(() => {
-        load();
-      }, 250);
-
-    return () =>
-      clearTimeout(timer);
-  }, [search]);
-
-  /* =======================================================
-     QUANTIDADE
-  ======================================================= */
-
-  async function alterarQuantidade(
-    item,
-    operacao,
-    valorEscolhido
-  ) {
-    const valor =
-      Number(
-        valorEscolhido || 1
-      );
-
-    if (
-      !Number.isInteger(valor) ||
-      valor <= 0
-    ) {
-      return;
-    }
-
-    const delta =
-      operacao ===
-      "somar"
-        ? valor
-        : -valor;
-
-    try {
-      const atualizado =
-        await api.updateQty(
-          item.id,
-          delta
-        );
-
-      setItems(
-        (anteriores) =>
-          anteriores.map(
-            (i) =>
-              String(i.id) ===
-              String(
-                atualizado.id ||
-                  item.id
-              )
-                ? {
-                    ...i,
-                    ...atualizado,
-                  }
-                : i
-          )
-      );
-
-      atualizarStatus();
-    } catch (error) {
-      console.error(
-        "Erro ao alterar quantidade:",
-        error
-      );
-
-      alert(
-        error?.message ||
-          "Não foi possível alterar a quantidade."
-      );
-    }
-  }
-
-  /* =======================================================
-     EXCLUIR
-  ======================================================= */
-
-  async function excluirItem() {
-    if (
-      !itemParaExcluir
-    ) {
-      return;
-    }
-
-    try {
-      await api.deleteItem(
-        itemParaExcluir.id
-      );
-
-      setItemParaExcluir(
-        null
-      );
-
-      await load();
-
-      atualizarStatus();
-    } catch (error) {
-      console.error(
-        "Erro ao excluir:",
-        error
-      );
-
-      alert(
-        error?.message ||
-          "Não foi possível excluir o item."
-      );
-    }
-  }
-
-  /* =======================================================
-     EXPORTAR BACKUP
+     BACKUP
   ======================================================= */
 
   async function exportarBackup() {
@@ -1633,8 +1702,6 @@ export default function Home() {
       URL.revokeObjectURL(
         url
       );
-
-      atualizarStatus();
     } catch (error) {
       console.error(
         "Erro ao exportar backup:",
@@ -1703,21 +1770,7 @@ export default function Home() {
         backup
       );
 
-      /*
-       * Recarrega usando o cache
-       * atualizado pelo importBackup.
-       */
-
-      const dados =
-        await api.getItems(
-          search
-        );
-
-      setItems(
-        Array.isArray(dados)
-          ? dados
-          : []
-      );
+      await load();
 
       atualizarStatus();
 
@@ -1736,6 +1789,222 @@ export default function Home() {
       );
     } finally {
       event.target.value = "";
+    }
+  }
+
+  /* =======================================================
+     CARREGAR
+  ======================================================= */
+
+  async function load() {
+    try {
+      setCarregando(true);
+
+      const data =
+        await api.getItems(
+          search
+        );
+
+      setItems(
+        Array.isArray(data)
+          ? data
+          : []
+      );
+
+      atualizarStatus();
+    } catch (error) {
+      console.error(
+        "Erro ao carregar itens:",
+        error
+      );
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  useEffect(() => {
+    const timer =
+      setTimeout(() => {
+        load();
+      }, 250);
+
+    return () =>
+      clearTimeout(timer);
+  }, [search]);
+
+  /* =======================================================
+     ALTERAR QUANTIDADE
+  ======================================================= */
+
+  async function alterarQuantidade(
+    item,
+    operacao,
+    valorEscolhido
+  ) {
+    /*
+     * Se o valor não foi informado,
+     * significa que o usuário clicou
+     * diretamente no + ou no -.
+     *
+     * Nesse caso pedimos o número.
+     */
+
+    let valor =
+      valorEscolhido;
+
+    if (
+      valor === undefined ||
+      valor === null
+    ) {
+      const resposta =
+        window.prompt(
+          operacao ===
+            "somar"
+            ? `Quantas unidades você deseja ADICIONAR ao item "${item.nome}"?`
+            : `Quantas unidades você deseja RETIRAR do item "${item.nome}"?`,
+          "1"
+        );
+
+      /*
+       * Cancelou o prompt.
+       */
+      if (
+        resposta === null
+      ) {
+        return;
+      }
+
+      const texto =
+        resposta.trim();
+
+      if (!texto) {
+        alert(
+          "Digite uma quantidade válida."
+        );
+        return;
+      }
+
+      valor =
+        Number(texto);
+    }
+
+    /*
+     * Aceitamos somente
+     * números inteiros positivos.
+     */
+
+    if (
+      !Number.isInteger(
+        Number(valor)
+      ) ||
+      Number(valor) <= 0
+    ) {
+      alert(
+        "Digite um número inteiro maior que zero."
+      );
+      return;
+    }
+
+    valor =
+      Number(valor);
+
+    /*
+     * Impede retirar mais do que
+     * existe no estoque.
+     */
+
+    if (
+      operacao ===
+        "subtrair" &&
+      valor >
+        Number(
+          item.quantidade
+        )
+    ) {
+      alert(
+        `Não é possível retirar ${valor} unidade(s).\n\nO item "${item.nome}" possui apenas ${Number(
+          item.quantidade
+        ) || 0} unidade(s) em estoque.`
+      );
+
+      return;
+    }
+
+    const delta =
+      operacao ===
+      "somar"
+        ? valor
+        : -valor;
+
+    try {
+      const atualizado =
+        await api.updateQty(
+          item.id,
+          delta
+        );
+
+      setItems(
+        (anteriores) =>
+          anteriores.map(
+            (i) =>
+              String(i.id) ===
+              String(
+                atualizado.id ||
+                  item.id
+              )
+                ? {
+                    ...i,
+                    ...atualizado,
+                  }
+                : i
+          )
+      );
+
+      atualizarStatus();
+    } catch (error) {
+      console.error(
+        "Erro ao alterar quantidade:",
+        error
+      );
+
+      alert(
+        error?.message ||
+          "Não foi possível alterar a quantidade."
+      );
+    }
+  }
+
+  /* =======================================================
+     EXCLUIR
+  ======================================================= */
+
+  async function excluirItem() {
+    if (
+      !itemParaExcluir
+    ) {
+      return;
+    }
+
+    try {
+      await api.deleteItem(
+        itemParaExcluir.id
+      );
+
+      setItemParaExcluir(
+        null
+      );
+
+      await load();
+    } catch (error) {
+      console.error(
+        "Erro ao excluir:",
+        error
+      );
+
+      alert(
+        error?.message ||
+          "Não foi possível excluir o item."
+      );
     }
   }
 
@@ -1763,10 +2032,6 @@ export default function Home() {
       tab,
       visualResults,
     ]);
-
-  /* =======================================================
-     CONTADORES
-  ======================================================= */
 
   const contadores =
     useMemo(() => {
@@ -1796,10 +2061,6 @@ export default function Home() {
       };
     }, [items]);
 
-  /* =======================================================
-     LIMPAR PESQUISA VISUAL
-  ======================================================= */
-
   function limparPesquisaVisual() {
     setVisualResults(
       null
@@ -1812,10 +2073,6 @@ export default function Home() {
 
   return (
     <div className="app-shell">
-      {/* =================================================
-          TOPO
-      ================================================= */}
-
       <header className="topbar">
         <div className="brand">
           <div className="brand-icon">
@@ -1850,8 +2107,7 @@ export default function Home() {
 
           {pendentes > 0 && (
             <div className="sync-pending">
-              ⟳{" "}
-              {pendentes}{" "}
+              ⟳ {pendentes}{" "}
               alteração
               {pendentes !== 1
                 ? "ões"
@@ -1865,10 +2121,6 @@ export default function Home() {
         </div>
       </header>
 
-      {/* =================================================
-          CONTEÚDO
-      ================================================= */}
-
       <main className="main-content">
         <div className="page-heading">
           <div>
@@ -1881,9 +2133,10 @@ export default function Home() {
             </h1>
 
             <p>
-              Gerencie EPIs, materiais
-              e uniformes em um só
-              lugar.
+              Gerencie EPIs,
+              materiais e
+              uniformes em um
+              só lugar.
             </p>
           </div>
 
@@ -1898,14 +2151,9 @@ export default function Home() {
             }
           >
             <span>+</span>
-
             Novo item
           </button>
         </div>
-
-        {/* =================================================
-            FERRAMENTAS
-        ================================================= */}
 
         <div className="toolbar">
           <div className="last-edit-bar">
@@ -2001,14 +2249,9 @@ export default function Home() {
             }
           >
             <span>📷</span>
-
             Pesquisar por foto
           </button>
         </div>
-
-        {/* =================================================
-            RESULTADOS VISUAIS
-        ================================================= */}
 
         {visualResults !==
           null && (
@@ -2038,10 +2281,6 @@ export default function Home() {
             </button>
           </div>
         )}
-
-        {/* =================================================
-            ABAS
-        ================================================= */}
 
         {visualResults ===
           null && (
@@ -2088,10 +2327,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* =================================================
-            CARREGANDO
-        ================================================= */}
-
         {carregando ? (
           <div className="loading-state">
             <div className="loading-spinner" />
@@ -2102,10 +2337,6 @@ export default function Home() {
           </div>
         ) : itemsExibidos.length ===
           0 ? (
-          /* =================================================
-             VAZIO
-          ================================================= */
-
           <div className="empty-state">
             <div className="empty-icon">
               📦
@@ -2143,10 +2374,6 @@ export default function Home() {
               )}
           </div>
         ) : (
-          /* =================================================
-             GRID
-          ================================================= */
-
           <div className="items-grid">
             {itemsExibidos.map(
               (item) => (
@@ -2174,10 +2401,6 @@ export default function Home() {
         )}
       </main>
 
-      {/* =================================================
-          MODAL ITEM
-      ================================================= */}
-
       {modal?.tipo ===
         "item" && (
         <ItemModal
@@ -2188,10 +2411,6 @@ export default function Home() {
           onSaved={load}
         />
       )}
-
-      {/* =================================================
-          MODAL PESQUISA VISUAL
-      ================================================= */}
 
       {modal?.tipo ===
         "visual" && (
@@ -2208,10 +2427,6 @@ export default function Home() {
           }
         />
       )}
-
-      {/* =================================================
-          MODAL EXCLUSÃO
-      ================================================= */}
 
       {itemParaExcluir && (
         <ModalConfirmacao
