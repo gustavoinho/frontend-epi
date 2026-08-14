@@ -82,124 +82,118 @@ async function imagemOtimizada(file) {
     return arquivoParaDataURL(file);
   }
 
-  return new Promise(
-    (resolve, reject) => {
-      const reader =
-        new FileReader();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
 
-      reader.onload = () => {
-        const img =
-          new Image();
+    reader.onload = () => {
+      const img = new Image();
 
-        img.onload = () => {
-          const limite = 1000;
+      img.onload = () => {
+        const limite = 1000;
 
-          let width =
-            img.naturalWidth ||
-            img.width;
+        let width =
+          img.naturalWidth ||
+          img.width;
 
-          let height =
-            img.naturalHeight ||
-            img.height;
+        let height =
+          img.naturalHeight ||
+          img.height;
 
-          if (!width || !height) {
-            reject(
-              new Error(
-                "Não foi possível identificar a imagem."
-              )
-            );
-            return;
-          }
-
-          if (
-            width > limite ||
-            height > limite
-          ) {
-            if (width > height) {
-              height = Math.round(
-                (height * limite) /
-                  width
-              );
-
-              width = limite;
-            } else {
-              width = Math.round(
-                (width * limite) /
-                  height
-              );
-
-              height = limite;
-            }
-          }
-
-          const canvas =
-            document.createElement(
-              "canvas"
-            );
-
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx =
-            canvas.getContext("2d");
-
-          if (!ctx) {
-            reject(
-              new Error(
-                "Não foi possível processar a imagem."
-              )
-            );
-            return;
-          }
-
-          ctx.fillStyle =
-            "#ffffff";
-
-          ctx.fillRect(
-            0,
-            0,
-            width,
-            height
-          );
-
-          ctx.drawImage(
-            img,
-            0,
-            0,
-            width,
-            height
-          );
-
-          const resultado =
-            canvas.toDataURL(
-              "image/jpeg",
-              0.72
-            );
-
-          resolve(resultado);
-        };
-
-        img.onerror = () =>
+        if (!width || !height) {
           reject(
             new Error(
-              "Não foi possível carregar a imagem."
+              "Não foi possível identificar a imagem."
             )
           );
+          return;
+        }
 
-        img.src =
-          reader.result;
+        if (
+          width > limite ||
+          height > limite
+        ) {
+          if (width > height) {
+            height = Math.round(
+              (height * limite) /
+                width
+            );
+
+            width = limite;
+          } else {
+            width = Math.round(
+              (width * limite) /
+                height
+            );
+
+            height = limite;
+          }
+        }
+
+        const canvas =
+          document.createElement(
+            "canvas"
+          );
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx =
+          canvas.getContext("2d");
+
+        if (!ctx) {
+          reject(
+            new Error(
+              "Não foi possível processar a imagem."
+            )
+          );
+          return;
+        }
+
+        ctx.fillStyle = "#ffffff";
+
+        ctx.fillRect(
+          0,
+          0,
+          width,
+          height
+        );
+
+        ctx.drawImage(
+          img,
+          0,
+          0,
+          width,
+          height
+        );
+
+        const resultado =
+          canvas.toDataURL(
+            "image/jpeg",
+            0.72
+          );
+
+        resolve(resultado);
       };
 
-      reader.onerror = () =>
+      img.onerror = () =>
         reject(
           new Error(
-            "Não foi possível ler a imagem."
+            "Não foi possível carregar a imagem."
           )
         );
 
-      reader.readAsDataURL(file);
-    }
-  );
+      img.src = reader.result;
+    };
+
+    reader.onerror = () =>
+      reject(
+        new Error(
+          "Não foi possível ler a imagem."
+        )
+      );
+
+    reader.readAsDataURL(file);
+  });
 }
 
 /* =========================================================
@@ -254,19 +248,14 @@ function ItemModal({
   onClose,
   onSaved,
 }) {
-  const editando =
-    Boolean(item);
+  const editando = Boolean(item);
 
   const [nome, setNome] =
-    useState(
-      item?.nome || ""
-    );
+    useState(item?.nome || "");
 
   const [quantidade, setQuantidade] =
     useState(
-      Number(
-        item?.quantidade
-      ) || 0
+      Number(item?.quantidade) || 0
     );
 
   const [status, setStatus] =
@@ -277,9 +266,7 @@ function ItemModal({
     );
 
   const [ca, setCa] =
-    useState(
-      item?.ca || ""
-    );
+    useState(item?.ca || "");
 
   const [observacoes, setObservacoes] =
     useState(
@@ -313,9 +300,8 @@ function ItemModal({
     if (!file) return;
 
     if (
-      !file.type.startsWith(
-        "image/"
-      )
+      !file.type ||
+      !file.type.startsWith("image/")
     ) {
       setErro(
         "A foto principal precisa ser uma imagem."
@@ -341,9 +327,7 @@ function ItemModal({
       setErro("");
 
       const dataUrl =
-        await imagemOtimizada(
-          file
-        );
+        await imagemOtimizada(file);
 
       if (
         typeof dataUrl !==
@@ -373,7 +357,7 @@ function ItemModal({
   }
 
   /* =======================================================
-     QUANTIDADE NO CADASTRO
+     QUANTIDADE
   ======================================================= */
 
   function alterarQuantidade(valor) {
@@ -407,9 +391,7 @@ function ItemModal({
         nome: nome.trim(),
 
         quantidade:
-          Number(
-            quantidade
-          ) || 0,
+          Number(quantidade) || 0,
 
         status,
 
@@ -630,8 +612,7 @@ function ItemModal({
                 </div>
               </div>
 
-              {status ===
-                "epi" && (
+              {status === "epi" && (
                 <label className="field">
                   <span>CA</span>
 
@@ -691,6 +672,8 @@ function ItemModal({
                     "Enter" ||
                   e.key === " "
                 ) {
+                  e.preventDefault();
+
                   fotoInputRef.current?.click();
                 }
               }}
@@ -738,9 +721,7 @@ function ItemModal({
             </div>
 
             <input
-              ref={
-                fotoInputRef
-              }
+              ref={fotoInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
               capture="environment"
@@ -769,9 +750,7 @@ function ItemModal({
             type="button"
             className="btn-secondary"
             onClick={onClose}
-            disabled={
-              salvando
-            }
+            disabled={salvando}
           >
             Cancelar
           </button>
@@ -780,9 +759,7 @@ function ItemModal({
             type="button"
             className="btn-primary"
             onClick={salvar}
-            disabled={
-              salvando
-            }
+            disabled={salvando}
           >
             {salvando ? (
               <>
@@ -898,12 +875,8 @@ function ItemCard({
           <div className="item-image">
             {fotoExibicao ? (
               <img
-                src={
-                  fotoExibicao
-                }
-                alt={
-                  item.nome
-                }
+                src={fotoExibicao}
+                alt={item.nome}
                 loading="lazy"
               />
             ) : (
@@ -962,21 +935,17 @@ function ItemCard({
             {Array.isArray(
               item.anexos
             ) &&
-              item.anexos
-                .length >
+              item.anexos.length >
                 0 && (
                 <span className="attachments-count">
                   📎{" "}
                   {
-                    item
-                      .anexos
+                    item.anexos
                       .length
                   }{" "}
                   anexo
-                  {item
-                    .anexos
-                    .length !==
-                  1
+                  {item.anexos
+                    .length !== 1
                     ? "s"
                     : ""}
                 </span>
@@ -1084,10 +1053,6 @@ export default function Home() {
     setCarregando,
   ] = useState(false);
 
-  /* =======================================================
-     STATUS
-  ======================================================= */
-
   const [online, setOnline] =
     useState(
       typeof navigator !==
@@ -1096,9 +1061,6 @@ export default function Home() {
         : true
     );
 
-  const [pendentes, setPendentes] =
-    useState(0);
-
   const [
     ultimaEdicao,
     setUltimaEdicao,
@@ -1106,6 +1068,13 @@ export default function Home() {
 
   const importInputRef =
     useRef(null);
+
+  const autosaveExecutado =
+    useRef(false);
+
+  /* =======================================================
+     STATUS LOCAL
+  ======================================================= */
 
   function atualizarStatus() {
     if (
@@ -1117,12 +1086,15 @@ export default function Home() {
       );
     }
 
-    setPendentes(
-      api.getPendingCount()
-    );
-
+    /*
+     * Não existe mais fila de sincronização
+     * com banco de dados.
+     */
     setUltimaEdicao(
-      api.getLastEdit()
+      typeof api.getLastEdit ===
+        "function"
+        ? api.getLastEdit()
+        : null
     );
   }
 
@@ -1173,7 +1145,7 @@ export default function Home() {
   }, []);
 
   /* =======================================================
-     ÚLTIMA EDIÇÃO
+     FORMATAR ÚLTIMA EDIÇÃO
   ======================================================= */
 
   function formatarUltimaEdicao(
@@ -1208,13 +1180,67 @@ export default function Home() {
   }
 
   /* =======================================================
-     BACKUP
+     GERAR BACKUP LOCAL
+     
+     O backup é criado diretamente a partir
+     dos dados locais.
   ======================================================= */
 
-  async function exportarBackup() {
-    try {
+  async function obterBackupLocal() {
+    /*
+     * O api.js novo deverá fornecer
+     * exportBackup().
+     *
+     * Se não existir, usamos os itens
+     * carregados na memória como fallback.
+     */
+
+    if (
+      typeof api.exportBackup ===
+      "function"
+    ) {
       const backup =
         await api.exportBackup();
+
+      if (
+        backup &&
+        Array.isArray(
+          backup.items
+        )
+      ) {
+        return backup;
+      }
+    }
+
+    return {
+      versao: 1,
+      aplicativo:
+        "Controle EPI",
+      exportadoEm:
+        new Date().toISOString(),
+      items: Array.isArray(items)
+        ? items
+        : [],
+    };
+  }
+
+  /* =======================================================
+     BAIXAR JSON
+  ======================================================= */
+
+  function baixarJSON(
+    backup,
+    automatico = false
+  ) {
+    try {
+      if (
+        !backup ||
+        !Array.isArray(
+          backup.items
+        )
+      ) {
+        return false;
+      }
 
       const json =
         JSON.stringify(
@@ -1249,8 +1275,22 @@ export default function Home() {
           .toISOString()
           .slice(0, 10);
 
+      const hora =
+        new Date()
+          .toTimeString()
+          .slice(0, 8)
+          .replace(
+            /:/g,
+            "-"
+          );
+
       link.download =
-        `backup-estoque-${data}.json`;
+        automatico
+          ? `autosave-estoque-${data}-${hora}.json`
+          : `backup-estoque-${data}.json`;
+
+      link.style.display =
+        "none";
 
       document.body.appendChild(
         link
@@ -1260,9 +1300,47 @@ export default function Home() {
 
       link.remove();
 
-      URL.revokeObjectURL(
-        url
+      /*
+       * Damos um pequeno tempo para
+       * o navegador iniciar o download.
+       */
+      setTimeout(() => {
+        URL.revokeObjectURL(
+          url
+        );
+      }, 1000);
+
+      return true;
+    } catch (error) {
+      console.error(
+        "Erro ao criar download JSON:",
+        error
       );
+
+      return false;
+    }
+  }
+
+  /* =======================================================
+     EXPORTAR BACKUP MANUAL
+  ======================================================= */
+
+  async function exportarBackup() {
+    try {
+      const backup =
+        await obterBackupLocal();
+
+      const sucesso =
+        baixarJSON(
+          backup,
+          false
+        );
+
+      if (!sucesso) {
+        throw new Error(
+          "Não foi possível criar o arquivo JSON."
+        );
+      }
     } catch (error) {
       console.error(
         "Erro ao exportar backup:",
@@ -1275,6 +1353,112 @@ export default function Home() {
       );
     }
   }
+
+  /* =======================================================
+     AUTOSAVE AO SAIR
+     
+     IMPORTANTE:
+     O navegador pode bloquear downloads
+     iniciados durante o fechamento da aba.
+
+     Mesmo assim tentamos fazer o backup.
+  ======================================================= */
+
+  async function executarAutosave() {
+    if (
+      autosaveExecutado.current
+    ) {
+      return;
+    }
+
+    autosaveExecutado.current =
+      true;
+
+    try {
+      /*
+       * Primeiro garante que o estado
+       * local já foi atualizado pelo api.js.
+       */
+      if (
+        typeof api.flushLocalSave ===
+        "function"
+      ) {
+        try {
+          await api.flushLocalSave();
+        } catch {}
+      }
+
+      const backup =
+        await obterBackupLocal();
+
+      baixarJSON(
+        backup,
+        true
+      );
+    } catch (error) {
+      console.error(
+        "Erro no autosave:",
+        error
+      );
+    }
+  }
+
+  /* =======================================================
+     EVENTOS DE SAÍDA DA PÁGINA
+  ======================================================= */
+
+  useEffect(() => {
+    const handlePageHide = () => {
+      executarAutosave();
+    };
+
+    const handleBeforeUnload =
+      () => {
+        executarAutosave();
+      };
+
+    const handleVisibilityChange =
+      () => {
+        if (
+          document.visibilityState ===
+          "hidden"
+        ) {
+          executarAutosave();
+        }
+      };
+
+    window.addEventListener(
+      "pagehide",
+      handlePageHide
+    );
+
+    window.addEventListener(
+      "beforeunload",
+      handleBeforeUnload
+    );
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    return () => {
+      window.removeEventListener(
+        "pagehide",
+        handlePageHide
+      );
+
+      window.removeEventListener(
+        "beforeunload",
+        handleBeforeUnload
+      );
+
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+    };
+  }, []);
 
   /* =======================================================
      IMPORTAR BACKUP
@@ -1327,10 +1511,23 @@ export default function Home() {
         return;
       }
 
+      if (
+        typeof api.importBackup !==
+        "function"
+      ) {
+        throw new Error(
+          "A função de importação local não está disponível no api.js."
+        );
+      }
+
       await api.importBackup(
         backup
       );
 
+      /*
+       * Recarrega diretamente do armazenamento
+       * local depois da importação.
+       */
       await load();
 
       atualizarStatus();
@@ -1361,10 +1558,17 @@ export default function Home() {
     try {
       setCarregando(true);
 
-      const data =
-        await api.getItems(
-          search
-        );
+      let data = [];
+
+      if (
+        typeof api.getItems ===
+        "function"
+      ) {
+        data =
+          await api.getItems(
+            search
+          );
+      }
 
       setItems(
         Array.isArray(data)
@@ -1378,6 +1582,8 @@ export default function Home() {
         "Erro ao carregar itens:",
         error
       );
+
+      setItems([]);
     } finally {
       setCarregando(false);
     }
@@ -1387,7 +1593,7 @@ export default function Home() {
     const timer =
       setTimeout(() => {
         load();
-      }, 250);
+      }, 100);
 
     return () =>
       clearTimeout(timer);
@@ -1453,18 +1659,19 @@ export default function Home() {
     valor =
       Number(valor);
 
+    const quantidadeAtual =
+      Number(
+        item.quantidade
+      ) || 0;
+
     if (
       operacao ===
         "subtrair" &&
       valor >
-        Number(
-          item.quantidade
-        )
+        quantidadeAtual
     ) {
       alert(
-        `Não é possível retirar ${valor} unidade(s).\n\nO item "${item.nome}" possui apenas ${Number(
-          item.quantidade
-        ) || 0} unidade(s) em estoque.`
+        `Não é possível retirar ${valor} unidade(s).\n\nO item "${item.nome}" possui apenas ${quantidadeAtual} unidade(s) em estoque.`
       );
 
       return;
@@ -1530,11 +1737,22 @@ export default function Home() {
         itemParaExcluir.id
       );
 
+      setItems(
+        (anteriores) =>
+          anteriores.filter(
+            (item) =>
+              String(item.id) !==
+              String(
+                itemParaExcluir.id
+              )
+          )
+      );
+
       setItemParaExcluir(
         null
       );
 
-      await load();
+      atualizarStatus();
     } catch (error) {
       console.error(
         "Erro ao excluir:",
@@ -1557,7 +1775,8 @@ export default function Home() {
       return items.filter(
         (item) =>
           (item.status ||
-            item.tipo) ===
+            item.tipo ||
+            "epi") ===
           tab
       );
     }, [
@@ -1571,7 +1790,8 @@ export default function Home() {
         epi: items.filter(
           (i) =>
             (i.status ||
-              i.tipo) ===
+              i.tipo ||
+              "epi") ===
             "epi"
         ).length,
 
@@ -1579,7 +1799,8 @@ export default function Home() {
           items.filter(
             (i) =>
               (i.status ||
-                i.tipo) ===
+                i.tipo ||
+                "epi") ===
               "material"
           ).length,
 
@@ -1587,7 +1808,8 @@ export default function Home() {
           items.filter(
             (i) =>
               (i.status ||
-                i.tipo) ===
+                i.tipo ||
+                "epi") ===
               "uniforme"
           ).length,
       };
@@ -1630,20 +1852,6 @@ export default function Home() {
               ? "Sistema online"
               : "Modo offline"}
           </div>
-
-          {pendentes > 0 && (
-            <div className="sync-pending">
-              ⟳ {pendentes}{" "}
-              alteração
-              {pendentes !== 1
-                ? "ões"
-                : ""}{" "}
-              pendente
-              {pendentes !== 1
-                ? "s"
-                : ""}
-            </div>
-          )}
         </div>
       </header>
 

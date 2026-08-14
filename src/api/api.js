@@ -2,23 +2,25 @@ const API =
   import.meta.env.VITE_API_URL ||
   "https://backend-epi.onrender.com";
 
-const CACHE_KEY = "epi_items_cache_v3";
-const QUEUE_KEY = "epi_sync_queue_v3";
-const ID_MAP_KEY = "epi_id_map_v3";
+const CACHE_KEY = "epi_items_cache_v4";
+const QUEUE_KEY = "epi_sync_queue_v4";
+const ID_MAP_KEY = "epi_id_map_v4";
 
 let sincronizando = false;
 let intervaloSincronizacao = null;
 
 /* =========================================================
-   EVENTO PARA ATUALIZAR A INTERFACE
+   EVENTO
 ========================================================= */
 
 function avisarAplicacao() {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(
-      new CustomEvent("estoque-atualizado")
-    );
+  if (typeof window === "undefined") {
+    return;
   }
+
+  window.dispatchEvent(
+    new CustomEvent("estoque-atualizado")
+  );
 }
 
 /* =========================================================
@@ -26,9 +28,7 @@ function avisarAplicacao() {
 ========================================================= */
 
 function estaOnline() {
-  if (
-    typeof navigator === "undefined"
-  ) {
+  if (typeof navigator === "undefined") {
     return true;
   }
 
@@ -36,20 +36,18 @@ function estaOnline() {
 }
 
 /* =========================================================
-   CACHE LOCAL
+   CACHE
 ========================================================= */
 
 function lerCache() {
   try {
-    const dados =
-      localStorage.getItem(CACHE_KEY);
+    const dados = localStorage.getItem(CACHE_KEY);
 
     if (!dados) {
       return [];
     }
 
-    const parsed =
-      JSON.parse(dados);
+    const parsed = JSON.parse(dados);
 
     return Array.isArray(parsed)
       ? parsed
@@ -68,13 +66,17 @@ function salvarCache(items) {
   try {
     localStorage.setItem(
       CACHE_KEY,
-      JSON.stringify(items)
+      JSON.stringify(
+        Array.isArray(items)
+          ? items
+          : []
+      )
     );
 
     avisarAplicacao();
   } catch (error) {
     console.error(
-      "Erro ao salvar cache local:",
+      "Erro ao salvar cache:",
       error
     );
 
@@ -91,9 +93,7 @@ function salvarCache(items) {
 function lerFila() {
   try {
     const dados =
-      localStorage.getItem(
-        QUEUE_KEY
-      );
+      localStorage.getItem(QUEUE_KEY);
 
     if (!dados) {
       return [];
@@ -119,7 +119,11 @@ function salvarFila(fila) {
   try {
     localStorage.setItem(
       QUEUE_KEY,
-      JSON.stringify(fila)
+      JSON.stringify(
+        Array.isArray(fila)
+          ? fila
+          : []
+      )
     );
 
     avisarAplicacao();
@@ -133,22 +137,6 @@ function salvarFila(fila) {
       "Não foi possível salvar a fila de sincronização local."
     );
   }
-}
-
-/* =========================================================
-   IDS / OPERAÇÕES
-========================================================= */
-
-function gerarIdOffline() {
-  return `offline-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 12)}`;
-}
-
-function gerarIdOperacao() {
-  return `sync-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 14)}`;
 }
 
 function adicionarFila(operacao) {
@@ -175,17 +163,49 @@ function adicionarFila(operacao) {
 }
 
 /* =========================================================
-   MAPA DE IDS OFFLINE
+   IDS
+========================================================= */
+
+function gerarIdOffline() {
+  return `offline-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 12)}`;
+}
+
+function gerarIdOperacao() {
+  return `sync-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 14)}`;
+}
+
+/* =========================================================
+   MAPA DE IDS
 ========================================================= */
 
 function lerMapaIds() {
   try {
-    return JSON.parse(
+    const dados =
       localStorage.getItem(
         ID_MAP_KEY
-      ) || "{}"
+      );
+
+    if (!dados) {
+      return {};
+    }
+
+    const mapa =
+      JSON.parse(dados);
+
+    return mapa &&
+      typeof mapa === "object"
+      ? mapa
+      : {};
+  } catch (error) {
+    console.error(
+      "Erro ao ler mapa de IDs:",
+      error
     );
-  } catch {
+
     return {};
   }
 }
@@ -208,7 +228,7 @@ function idReal(id) {
   const mapa =
     lerMapaIds();
 
-  return mapa[id] || id;
+  return mapa[String(id)] || id;
 }
 
 /* =========================================================
@@ -231,8 +251,9 @@ async function tratarResposta(res) {
 
   if (!res.ok) {
     throw new Error(
-      data.error ||
-        "Ocorreu um erro no servidor."
+      data?.error ||
+        data?.message ||
+        `Erro HTTP ${res.status}.`
     );
   }
 
@@ -257,12 +278,9 @@ async function fetchComTimeout(
   let timer = null;
 
   if (controller) {
-    timer = setTimeout(
-      () => {
-        controller.abort();
-      },
-      timeout
-    );
+    timer = setTimeout(() => {
+      controller.abort();
+    }, timeout);
   }
 
   try {
@@ -318,183 +336,7 @@ async function buscarServidor(
 }
 
 /* =========================================================
-   APLICAR OPERAÇÃO LOCAL
-========================================================= */
-
-function aplicarOperacaoLocal(
-  items,
-  operacao
-) {
-  const copia = [
-    ...items,
-  ];
-
-  if (
-    operacao.tipo ===
-    "create"
-  ) {
-    const existe =
-      copia.some(
-        (item) =>
-          String(item.id) ===
-          String(
-            operacao.item.id
-          )
-      );
-
-    if (!existe) {
-      copia.push(
-        operacao.item
-      );
-    }
-
-    return copia;
-  }
-
-  if (
-    operacao.tipo ===
-    "update"
-  ) {
-    return copia.map(
-      (item) =>
-        String(item.id) ===
-        String(
-          operacao.id
-        )
-          ? {
-              ...item,
-              ...operacao.data,
-              id: item.id,
-              updated_at:
-                operacao.data
-                  ?.updated_at ||
-                item.updated_at ||
-                agora(),
-            }
-          : item
-    );
-  }
-
-  if (
-    operacao.tipo ===
-    "qty"
-  ) {
-    return copia.map(
-      (item) => {
-        if (
-          String(item.id) !==
-          String(
-            operacao.id
-          )
-        ) {
-          return item;
-        }
-
-        const atual =
-          Number(
-            item.quantidade
-          ) || 0;
-
-        return {
-          ...item,
-          quantidade:
-            Math.max(
-              0,
-              atual +
-                Number(
-                  operacao.delta
-                )
-            ),
-          updated_at:
-            operacao.updated_at ||
-            agora(),
-        };
-      }
-    );
-  }
-
-  if (
-    operacao.tipo ===
-    "delete"
-  ) {
-    return copia.filter(
-      (item) =>
-        String(item.id) !==
-        String(
-          operacao.id
-        )
-    );
-  }
-
-  return copia;
-}
-
-/* =========================================================
-   ATUALIZAR IDS DAS OPERAÇÕES DA FILA
-========================================================= */
-
-function substituirIdNasOperacoes(
-  fila,
-  idTemporario,
-  idNovo
-) {
-  return fila.map(
-    (op) => {
-      const novaOperacao =
-        {
-          ...op,
-        };
-
-      if (
-        String(
-          novaOperacao.id
-        ) ===
-        String(
-          idTemporario
-        )
-      ) {
-        novaOperacao.id =
-          idNovo;
-      }
-
-      if (
-        novaOperacao.item &&
-        String(
-          novaOperacao
-            .item.id
-        ) ===
-        String(
-          idTemporario
-        )
-      ) {
-        novaOperacao.item = {
-          ...novaOperacao.item,
-          id: idNovo,
-        };
-      }
-
-      if (
-        novaOperacao.data &&
-        String(
-          novaOperacao.data.id
-        ) ===
-        String(
-          idTemporario
-        )
-      ) {
-        novaOperacao.data = {
-          ...novaOperacao.data,
-          id: idNovo,
-        };
-      }
-
-      return novaOperacao;
-    }
-  );
-}
-
-/* =========================================================
-   ATUALIZAR CACHE COM ITEM DO SERVIDOR
+   ATUALIZAR ITEM NO CACHE
 ========================================================= */
 
 function atualizarItemNoCache(
@@ -508,35 +350,35 @@ function atualizarItemNoCache(
   const cache =
     lerCache();
 
-  const idParaSubstituir =
+  const idAntigo =
     idAnterior ??
     itemServidor.id;
 
   let encontrou = false;
 
   const novoCache =
-    cache.map(
-      (item) => {
-        if (
-          String(item.id) ===
-          String(
-            idParaSubstituir
-          ) ||
-          String(item.id) ===
-          String(
-            itemServidor.id
-          )
-        ) {
-          encontrou = true;
+    cache.map((item) => {
+      const mesmoIdAntigo =
+        String(item.id) ===
+        String(idAntigo);
 
-          return {
-            ...itemServidor,
-          };
-        }
+      const mesmoIdNovo =
+        String(item.id) ===
+        String(itemServidor.id);
 
-        return item;
+      if (
+        mesmoIdAntigo ||
+        mesmoIdNovo
+      ) {
+        encontrou = true;
+
+        return {
+          ...itemServidor,
+        };
       }
-    );
+
+      return item;
+    });
 
   if (!encontrou) {
     novoCache.push({
@@ -544,13 +386,63 @@ function atualizarItemNoCache(
     });
   }
 
-  salvarCache(
-    novoCache
-  );
+  salvarCache(novoCache);
 }
 
 /* =========================================================
-   SINCRONIZAR
+   SUBSTITUIR IDS TEMPORÁRIOS
+========================================================= */
+
+function substituirIdNasOperacoes(
+  fila,
+  idTemporario,
+  idNovo
+) {
+  return fila.map((op) => {
+    const novaOperacao = {
+      ...op,
+    };
+
+    if (
+      String(novaOperacao.id) ===
+      String(idTemporario)
+    ) {
+      novaOperacao.id =
+        idNovo;
+    }
+
+    if (
+      novaOperacao.item &&
+      String(
+        novaOperacao.item.id
+      ) ===
+        String(idTemporario)
+    ) {
+      novaOperacao.item = {
+        ...novaOperacao.item,
+        id: idNovo,
+      };
+    }
+
+    if (
+      novaOperacao.data &&
+      String(
+        novaOperacao.data.id
+      ) ===
+        String(idTemporario)
+    ) {
+      novaOperacao.data = {
+        ...novaOperacao.data,
+        id: idNovo,
+      };
+    }
+
+    return novaOperacao;
+  });
+}
+
+/* =========================================================
+   SINCRONIZAÇÃO
 ========================================================= */
 
 async function sincronizar() {
@@ -564,8 +456,7 @@ async function sincronizar() {
   sincronizando = true;
 
   try {
-    let fila =
-      lerFila();
+    let fila = lerFila();
 
     while (
       fila.length > 0 &&
@@ -588,7 +479,7 @@ async function sincronizar() {
 
       try {
         /* =================================================
-           BACKUP / IMPORTAÇÃO
+           BACKUP
         ================================================= */
 
         if (
@@ -603,9 +494,11 @@ async function sincronizar() {
                 headers: {
                   "Content-Type":
                     "application/json",
+
                   "X-Sync-Operation-ID":
                     operacao.operationId,
                 },
+
                 body:
                   JSON.stringify({
                     items:
@@ -619,43 +512,38 @@ async function sincronizar() {
           );
 
           fila.shift();
+
           salvarFila(fila);
 
           continue;
         }
 
         /* =================================================
-           CRIAR
+           CREATE
         ================================================= */
 
         if (
           operacao.tipo ===
           "create"
         ) {
-          const itemParaEnviar =
-            {
-              ...operacao.item,
-            };
-
-          /*
-           * O ID offline é usado apenas
-           * pelo frontend.
-           *
-           * O backend gera o ID real
-           * do PostgreSQL.
-           */
+          const itemParaEnviar = {
+            ...operacao.item,
+          };
 
           const res =
             await fetchComTimeout(
               `${API}/items`,
               {
                 method: "POST",
+
                 headers: {
                   "Content-Type":
                     "application/json",
+
                   "X-Sync-Operation-ID":
                     operacao.operationId,
                 },
+
                 body:
                   JSON.stringify(
                     itemParaEnviar
@@ -672,8 +560,7 @@ async function sincronizar() {
             !criado ||
             criado.id ===
               undefined ||
-            criado.id ===
-              null
+            criado.id === null
           ) {
             throw new Error(
               "O servidor não retornou o ID real do item criado."
@@ -683,21 +570,20 @@ async function sincronizar() {
           const idTemporario =
             operacao.item.id;
 
+          /* Atualiza mapa */
+
           const mapa =
             lerMapaIds();
 
           mapa[
-            idTemporario
+            String(idTemporario)
           ] = criado.id;
 
           salvarMapaIds(
             mapa
           );
 
-          /*
-           * Substitui o item temporário
-           * pelo item oficial do banco.
-           */
+          /* Atualiza cache */
 
           atualizarItemNoCache(
             criado,
@@ -705,8 +591,9 @@ async function sincronizar() {
           );
 
           /*
-           * Atualiza as próximas
-           * operações que ainda usam
+           * IMPORTANTE:
+           * atualiza todas as operações
+           * seguintes que ainda utilizam
            * o ID offline.
            */
 
@@ -718,8 +605,8 @@ async function sincronizar() {
             );
 
           /*
-           * Remove SOMENTE a operação
-           * que o backend confirmou.
+           * Remove somente o CREATE
+           * que acabou de ser confirmado.
            */
 
           fila.shift();
@@ -730,7 +617,7 @@ async function sincronizar() {
         }
 
         /* =================================================
-           EDITAR
+           UPDATE
         ================================================= */
 
         if (
@@ -752,6 +639,19 @@ async function sincronizar() {
             );
           }
 
+          const dados =
+            {
+              ...operacao.data,
+            };
+
+          /*
+           * O ID é controlado pela URL.
+           * Não precisamos enviar ID temporário
+           * no corpo.
+           */
+
+          delete dados.id;
+
           const res =
             await fetchComTimeout(
               `${API}/items/${encodeURIComponent(
@@ -759,15 +659,18 @@ async function sincronizar() {
               )}`,
               {
                 method: "PUT",
+
                 headers: {
                   "Content-Type":
                     "application/json",
+
                   "X-Sync-Operation-ID":
                     operacao.operationId,
                 },
+
                 body:
                   JSON.stringify(
-                    operacao.data
+                    dados
                   ),
               }
             );
@@ -783,6 +686,7 @@ async function sincronizar() {
           );
 
           fila.shift();
+
           salvarFila(fila);
 
           continue;
@@ -818,16 +722,21 @@ async function sincronizar() {
               )}/qty`,
               {
                 method: "PATCH",
+
                 headers: {
                   "Content-Type":
                     "application/json",
+
                   "X-Sync-Operation-ID":
                     operacao.operationId,
                 },
+
                 body:
                   JSON.stringify({
                     delta:
-                      operacao.delta,
+                      Number(
+                        operacao.delta
+                      ),
                   }),
               }
             );
@@ -843,13 +752,14 @@ async function sincronizar() {
           );
 
           fila.shift();
+
           salvarFila(fila);
 
           continue;
         }
 
         /* =================================================
-           EXCLUIR
+           DELETE
         ================================================= */
 
         if (
@@ -861,22 +771,19 @@ async function sincronizar() {
               operacao.id
             );
 
+          /*
+           * Se ainda é offline,
+           * não existe nada no servidor
+           * para excluir.
+           */
+
           if (
             String(id).startsWith(
               "offline-"
             )
           ) {
-            /*
-             * Isso normalmente significa
-             * que o item foi criado offline
-             * e a criação ainda está na fila.
-             *
-             * Não deve chegar aqui se a
-             * exclusão offline foi registrada
-             * corretamente.
-             */
-
             fila.shift();
+
             salvarFila(fila);
 
             continue;
@@ -889,6 +796,7 @@ async function sincronizar() {
               )}`,
               {
                 method: "DELETE",
+
                 headers: {
                   "X-Sync-Operation-ID":
                     operacao.operationId,
@@ -900,23 +808,16 @@ async function sincronizar() {
             res
           );
 
-          /*
-           * O servidor confirmou a exclusão.
-           * Agora podemos remover qualquer
-           * referência local ao item.
-           */
-
           salvarCache(
             lerCache().filter(
               (item) =>
-                String(
-                  item.id
-                ) !==
+                String(item.id) !==
                 String(id)
             )
           );
 
           fila.shift();
+
           salvarFila(fila);
 
           continue;
@@ -927,52 +828,46 @@ async function sincronizar() {
         ================================================= */
 
         console.error(
-          "Operação de sincronização desconhecida:",
+          "Operação desconhecida:",
           operacao
         );
-
-        /*
-         * Não removemos automaticamente
-         * uma operação desconhecida.
-         *
-         * Isso evita perda silenciosa
-         * de dados.
-         */
 
         throw new Error(
           `Operação de sincronização desconhecida: ${operacao.tipo}`
         );
       } catch (error) {
         /*
-         * A operação continua na fila.
+         * NÃO remove a operação.
          *
-         * Isso é fundamental:
-         * não removemos a operação quando
-         * a requisição falha.
+         * Ela continuará na fila
+         * para uma próxima tentativa.
          */
 
-        fila =
+        const filaAtual =
           lerFila();
 
         if (
-          fila.length > 0
+          filaAtual.length > 0
         ) {
-          fila[0] = {
-            ...fila[0],
+          filaAtual[0] = {
+            ...filaAtual[0],
+
             tentativas:
               (Number(
-                fila[0]
+                filaAtual[0]
                   .tentativas
               ) || 0) + 1,
+
             ultimoErro:
               error?.message ||
               "Erro desconhecido",
+
             ultimaTentativa:
               agora(),
           };
 
           salvarFila(
-            fila
+            filaAtual
           );
         }
 
@@ -989,16 +884,13 @@ async function sincronizar() {
         lerFila();
     }
 
-    /*
-     * Depois de sincronizar TODAS as
-     * operações pendentes, busca a
-     * versão oficial do servidor.
-     */
+    /* =====================================================
+       ATUALIZAR CACHE COM SERVIDOR
+    ===================================================== */
 
     if (
       estaOnline() &&
-      lerFila().length ===
-        0
+      lerFila().length === 0
     ) {
       try {
         const servidor =
@@ -1017,7 +909,7 @@ async function sincronizar() {
         }
       } catch (error) {
         console.warn(
-          "Não foi possível atualizar o cache oficial:",
+          "Não foi possível atualizar o cache:",
           error?.message ||
             error
         );
@@ -1032,7 +924,7 @@ async function sincronizar() {
 }
 
 /* =========================================================
-   SINCRONIZAÇÃO AUTOMÁTICA
+   EVENTOS DE CONEXÃO
 ========================================================= */
 
 if (
@@ -1046,18 +938,9 @@ if (
         "🌐 Internet voltou. Sincronizando..."
       );
 
-      /*
-       * Pequeno atraso para dar
-       * tempo à conexão voltar
-       * completamente.
-       */
-
-      setTimeout(
-        () => {
-          sincronizar();
-        },
-        500
-      );
+      setTimeout(() => {
+        sincronizar();
+      }, 500);
     }
   );
 
@@ -1072,47 +955,24 @@ if (
     }
   );
 
-  /*
-   * Também tenta sincronizar
-   * periodicamente.
-   *
-   * Isso cobre casos em que o
-   * evento "online" não seja
-   * disparado corretamente.
-   */
-
   intervaloSincronizacao =
-    setInterval(
-      () => {
-        if (
-          estaOnline() &&
-          lerFila()
-            .length > 0
-        ) {
-          sincronizar();
-        }
-      },
-      10000
-    );
-
-  /*
-   * Importante:
-   * se o aplicativo for aberto
-   * já estando online, a fila
-   * também será processada.
-   */
-
-  setTimeout(
-    () => {
+    setInterval(() => {
       if (
         estaOnline() &&
         lerFila().length > 0
       ) {
         sincronizar();
       }
-    },
-    300
-  );
+    }, 10000);
+
+  setTimeout(() => {
+    if (
+      estaOnline() &&
+      lerFila().length > 0
+    ) {
+      sincronizar();
+    }
+  }, 300);
 }
 
 /* =========================================================
@@ -1121,16 +981,23 @@ if (
 
 export const api = {
   /* =======================================================
-     LISTAR
+     LISTAR ITENS
   ======================================================= */
 
   async getItems(search = "") {
     let items =
       lerCache();
 
+    const termo =
+      String(
+        search || ""
+      )
+        .trim()
+        .toLowerCase();
+
     /*
-     * Se não houver cache e houver
-     * conexão, tenta buscar o servidor.
+     * Se o cache estiver vazio,
+     * tenta buscar no servidor.
      */
 
     if (
@@ -1140,7 +1007,7 @@ export const api = {
       try {
         const servidor =
           await buscarServidor(
-            search
+            ""
           );
 
         if (
@@ -1148,12 +1015,6 @@ export const api = {
             servidor
           )
         ) {
-          /*
-           * Só substituímos o cache
-           * se não existirem operações
-           * pendentes.
-           */
-
           if (
             lerFila().length ===
             0
@@ -1176,7 +1037,8 @@ export const api = {
     }
 
     /*
-     * Sincroniza em segundo plano.
+     * Inicia sincronização em
+     * segundo plano.
      */
 
     if (estaOnline()) {
@@ -1184,50 +1046,66 @@ export const api = {
     }
 
     /*
-     * Se a busca for vazia,
-     * retorna o cache completo.
+     * Sem pesquisa:
+     * retorna todos os itens.
      */
-
-    const termo =
-      String(
-        search || ""
-      )
-        .trim()
-        .toLowerCase();
 
     if (!termo) {
       return items;
     }
 
     /*
-     * Pesquisa local.
+     * Pesquisa local por:
+     * - nome
+     * - CA
+     * - observações
+     * - categoria
      */
 
     return items.filter(
-      (item) =>
-        String(
-          item.nome || ""
-        )
-          .toLowerCase()
-          .includes(termo) ||
-        String(
-          item.ca || ""
-        )
-          .toLowerCase()
-          .includes(termo) ||
-        String(
-          item.observacoes ||
-            ""
-        )
-          .toLowerCase()
-          .includes(termo) ||
-        String(
-          item.status ||
-            item.tipo ||
-            ""
-        )
-          .toLowerCase()
-          .includes(termo)
+      (item) => {
+        const nome =
+          String(
+            item.nome || ""
+          )
+            .toLowerCase();
+
+        const ca =
+          String(
+            item.ca || ""
+          )
+            .toLowerCase();
+
+        const observacoes =
+          String(
+            item.observacoes ||
+              ""
+          )
+            .toLowerCase();
+
+        const categoria =
+          String(
+            item.status ||
+              item.tipo ||
+              ""
+          )
+            .toLowerCase();
+
+        return (
+          nome.includes(
+            termo
+          ) ||
+          ca.includes(
+            termo
+          ) ||
+          observacoes.includes(
+            termo
+          ) ||
+          categoria.includes(
+            termo
+          )
+        );
+      }
     );
   },
 
@@ -1241,22 +1119,44 @@ export const api = {
 
     const item = {
       ...data,
+
       id,
+
       quantidade:
         Number(
           data.quantidade
         ) || 0,
+
+      status:
+        data.status ||
+        data.tipo ||
+        "epi",
+
+      tipo:
+        data.tipo ||
+        data.status ||
+        "epi",
+
       updated_at:
         agora(),
     };
 
-    const items =
+    const cache =
       lerCache();
 
     salvarCache([
-      ...items,
+      ...cache,
       item,
     ]);
+
+    /*
+     * Sempre adiciona à fila.
+     *
+     * Mesmo online fazemos isso,
+     * porque a sincronização será
+     * responsável por enviar ao
+     * servidor.
+     */
 
     adicionarFila({
       tipo: "create",
@@ -1278,23 +1178,40 @@ export const api = {
     id,
     data
   ) {
+    const cache =
+      lerCache();
+
     const atual =
-      lerCache().find(
+      cache.find(
         (item) =>
           String(item.id) ===
           String(id)
       );
 
+    if (!atual) {
+      throw new Error(
+        "Item não encontrado."
+      );
+    }
+
     const atualizado = {
-      ...(atual || {}),
+      ...atual,
       ...data,
+
       id,
+
+      quantidade:
+        Number(
+          data.quantidade ??
+            atual.quantidade
+        ) || 0,
+
       updated_at:
         agora(),
     };
 
     salvarCache(
-      lerCache().map(
+      cache.map(
         (item) =>
           String(item.id) ===
           String(id)
@@ -1304,13 +1221,11 @@ export const api = {
     );
 
     /*
-     * Item criado offline:
+     * ITEM OFFLINE
      *
-     * Não criamos uma operação
-     * PUT separada.
-     *
-     * Atualizamos a própria
-     * operação CREATE.
+     * Se ainda não existe no servidor,
+     * atualizamos a própria operação
+     * CREATE.
      */
 
     if (
@@ -1323,29 +1238,44 @@ export const api = {
 
       const novaFila =
         fila.map(
-          (op) =>
-            op.tipo ===
-              "create" &&
-            String(
-              op.item?.id
-            ) ===
-              String(id)
-              ? {
-                  ...op,
-                  item:
-                    atualizado,
-                }
-              : op
+          (op) => {
+            if (
+              op.tipo ===
+                "create" &&
+              String(
+                op.item?.id
+              ) ===
+                String(id)
+            ) {
+              return {
+                ...op,
+
+                item: {
+                  ...atualizado,
+                },
+              };
+            }
+
+            return op;
+          }
         );
 
       salvarFila(
         novaFila
       );
     } else {
+      /*
+       * ITEM JÁ EXISTENTE NO SERVIDOR
+       */
+
       adicionarFila({
         tipo: "update",
+
         id,
-        data: atualizado,
+
+        data: {
+          ...atualizado,
+        },
       });
     }
 
@@ -1362,8 +1292,8 @@ export const api = {
 
   async deleteItem(id) {
     /*
-     * Remove imediatamente do
-     * cache visual.
+     * Remove imediatamente
+     * da interface/cache.
      */
 
     salvarCache(
@@ -1375,20 +1305,11 @@ export const api = {
     );
 
     /*
-     * Se o item ainda possui ID
-     * temporário, ele nunca chegou
-     * ao PostgreSQL.
+     * ITEM CRIADO OFFLINE
      *
-     * Portanto:
-     *
-     * CREATE
-     * UPDATE
-     * QTY
-     * DELETE
-     *
-     * podem ser descartados,
-     * pois o estado final desejado
-     * é "item inexistente".
+     * Se ainda não chegou ao servidor,
+     * simplesmente removemos todas as
+     * operações relacionadas a ele.
      */
 
     if (
@@ -1399,7 +1320,7 @@ export const api = {
       const fila =
         lerFila();
 
-      salvarFila(
+      const novaFila =
         fila.filter(
           (op) => {
             if (
@@ -1417,7 +1338,7 @@ export const api = {
               String(
                 op.id
               ) ===
-              String(id)
+                String(id)
             ) {
               return false;
             }
@@ -1426,14 +1347,26 @@ export const api = {
               String(
                 op.data?.id
               ) ===
-              String(id)
+                String(id)
+            ) {
+              return false;
+            }
+
+            if (
+              String(
+                op.item?.id
+              ) ===
+                String(id)
             ) {
               return false;
             }
 
             return true;
           }
-        )
+        );
+
+      salvarFila(
+        novaFila
       );
 
       return {
@@ -1442,8 +1375,7 @@ export const api = {
     }
 
     /*
-     * Item existente no servidor:
-     * cria operação DELETE.
+     * ITEM EXISTENTE NO SERVIDOR
      */
 
     adicionarFila({
@@ -1461,7 +1393,7 @@ export const api = {
   },
 
   /* =======================================================
-     QUANTIDADE
+     ALTERAR QUANTIDADE
   ======================================================= */
 
   async updateQty(
@@ -1481,8 +1413,17 @@ export const api = {
       );
     }
 
+    if (valor === 0) {
+      throw new Error(
+        "A quantidade precisa ser diferente de zero."
+      );
+    }
+
+    const cache =
+      lerCache();
+
     const atual =
-      lerCache().find(
+      cache.find(
         (item) =>
           String(item.id) ===
           String(id)
@@ -1494,21 +1435,41 @@ export const api = {
       );
     }
 
+    const quantidadeAtual =
+      Number(
+        atual.quantidade
+      ) || 0;
+
+    const novaQuantidade =
+      quantidadeAtual +
+      valor;
+
+    if (
+      novaQuantidade <
+      0
+    ) {
+      throw new Error(
+        "Não é possível deixar a quantidade abaixo de zero."
+      );
+    }
+
     const atualizado = {
       ...atual,
+
       quantidade:
-        Math.max(
-          0,
-          (Number(
-            atual.quantidade
-          ) || 0) + valor
-        ),
+        novaQuantidade,
+
       updated_at:
         agora(),
     };
 
+    /*
+     * Atualiza imediatamente
+     * na tela.
+     */
+
     salvarCache(
-      lerCache().map(
+      cache.map(
         (item) =>
           String(item.id) ===
           String(id)
@@ -1518,18 +1479,21 @@ export const api = {
     );
 
     /*
-     * Mesmo para item offline,
-     * guardamos a operação.
+     * Guarda a operação.
      *
-     * Ela será convertida para
+     * Se o item foi criado offline,
+     * o ID será substituído pelo
      * ID real quando o CREATE
-     * for confirmado.
+     * for sincronizado.
      */
 
     adicionarFila({
       tipo: "qty",
+
       id,
+
       delta: valor,
+
       updated_at:
         atualizado.updated_at,
     });
@@ -1546,16 +1510,17 @@ export const api = {
   ======================================================= */
 
   async exportBackup() {
-    const items =
-      lerCache();
-
     return {
       versao: 1,
+
       aplicativo:
         "Controle EPI",
+
       exportadoEm:
         agora(),
-      items,
+
+      items:
+        lerCache(),
     };
   },
 
@@ -1581,6 +1546,22 @@ export const api = {
       backup.items.map(
         (item) => ({
           ...item,
+
+          quantidade:
+            Number(
+              item.quantidade
+            ) || 0,
+
+          status:
+            item.status ||
+            item.tipo ||
+            "epi",
+
+          tipo:
+            item.tipo ||
+            item.status ||
+            "epi",
+
           updated_at:
             item.updated_at ||
             agora(),
@@ -1589,7 +1570,7 @@ export const api = {
 
     /*
      * Mostra imediatamente
-     * o backup localmente.
+     * o backup no dispositivo.
      */
 
     salvarCache(
@@ -1597,22 +1578,36 @@ export const api = {
     );
 
     /*
-     * O backup também entra
-     * na fila persistente.
+     * Remove operações antigas
+     * de backup para evitar duas
+     * restaurações seguidas.
      */
 
-    salvarFila([
-      {
-        tipo:
-          "backupImport",
-        items,
-        operationId:
-          gerarIdOperacao(),
-        criadoEm:
-          agora(),
-        tentativas: 0,
-      },
-    ]);
+    const fila =
+      lerFila().filter(
+        (op) =>
+          op.tipo !==
+          "backupImport"
+      );
+
+    fila.push({
+      tipo:
+        "backupImport",
+
+      items,
+
+      operationId:
+        gerarIdOperacao(),
+
+      criadoEm:
+        agora(),
+
+      tentativas: 0,
+    });
+
+    salvarFila(
+      fila
+    );
 
     if (estaOnline()) {
       sincronizar();
@@ -1633,23 +1628,18 @@ export const api = {
     return lerFila().length;
   },
 
+  /* =======================================================
+     ÚLTIMA EDIÇÃO
+  ======================================================= */
+
   getLastEdit() {
     const items =
       lerCache();
 
-    if (
-      items.length ===
-      0
-    ) {
-      return null;
-    }
-
-    let ultima =
-      null;
+    let ultima = null;
 
     for (
-      const item of
-      items
+      const item of items
     ) {
       if (
         !item.updated_at
@@ -1683,5 +1673,28 @@ export const api = {
       : null;
   },
 
+  /* =======================================================
+     SINCRONIZAR MANUALMENTE
+  ======================================================= */
+
   sincronizar,
 };
+
+/* =========================================================
+   LIMPEZA AO DESCARREGAR A PÁGINA
+========================================================= */
+
+if (
+  typeof window !==
+    "undefined" &&
+  intervaloSincronizacao
+) {
+  window.addEventListener(
+    "beforeunload",
+    () => {
+      clearInterval(
+        intervaloSincronizacao
+      );
+    }
+  );
+}
